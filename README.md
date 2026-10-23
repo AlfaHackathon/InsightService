@@ -30,17 +30,6 @@
 
 ## Пакеты, запуск и проверки
 
-Сборка без токена доступна из корня общего workspace:
-
-```powershell
-./cluster/tools/Build-OrganizationPackages.ps1
-```
-
-Скрипт собирает настоящие NuGet-пакеты из неизменённых публичных исходников
-AlfaHackathon на закреплённых коммитах, затем восстанавливает и собирает оба сервиса
-в отдельном cache. SHA256 пакетов и commit IDs сохраняются в `.artifacts` вместе с
-generated config. Это явная сборка из исходников; подробности — в `../cluster/tools/README.md`.
-
 Обычный restore использует GitHub Packages организации `https://nuget.pkg.github.com/AlfaHackathon/index.json` и nuget.org согласно InsightService/NuGet.Config. Credentials настраиваются вне репозитория штатным NuGet credential provider или защищённым окружением `NuGetPackageSourceCredentials_github=Username=<github-login>;Password=<PAT>;ValidAuthenticationTypes=Basic`; токены не помещаются в исходники. Ссылки на локальные source-built feeds не являются конфигурацией запуска.
 
 Команды из каталога InsightService:
