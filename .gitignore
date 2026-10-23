@@ -1,0 +1,8 @@
+bin/
+obj/
+data/
+TestResults/
+*.db
+*.db-shm
+*.db-wal
+.env
