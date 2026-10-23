@@ -12,6 +12,77 @@ public sealed class AnalysisPreparationService(IEffectRepository repository, IAn
     ContextEvidenceClient evidence, CompanyKnowledgeClient company)
 {
     private static readonly string[] MissingExposure = ["В загруженном корпусе не установлены собственные договорные, имущественные или операционные основания применимости. Это не доказывает отсутствия обязательств."];
+    public async Task<Result<object>> ValidateApplicability(ApplicabilityValidation request, CancellationToken ct)
+    {
+        if (request.CompanyId == Guid.Empty || request.AsOf == default || request.Candidates is null || request.Candidates.Length > 32)
+        {
+            return new(Invalid());
+        }
+        var cache = new Dictionary<(string, string), Contracts.Context.MaterialVersion>();
+        async Task<Result<Contracts.Context.MaterialVersion>> Material(string materialId, string versionId)
+        {
+            if (!cache.TryGetValue((materialId, versionId), out var material))
+            {
+                if (cache.Count >= 128)
+                {
+                    return new(Invalid());
+                }
+                var resolved = await sources.GetAsync(materialId, versionId, ct);
+                if (resolved.Error is { } error)
+                {
+                    return new(error);
+                }
+                material = resolved.Content!;
+                cache[(materialId, versionId)] = material;
+            }
+            if (material.MaterialId != materialId || material.VersionId != versionId || material.KnownAt > request.AsOf ||
+                material.CompanyIds.Length > 0 && !material.CompanyIds.Contains(request.CompanyId))
+            {
+                return new(Invalid());
+            }
+            return new(material, null);
+        }
+        foreach (var candidate in request.Candidates)
+        {
+            if (candidate is null || candidate.Assessment is { Conditions: null } or { Unknowns: null } ||
+                candidate.Assessment?.Conditions.Length > 16 || candidate.Assessment?.Unknowns.Length > 16 ||
+                candidate.EvidenceStatus is not (null or "supported" or "conditional" or "unknown" or "unaffected" or "contradicted"))
+            {
+                return new(Invalid());
+            }
+            var references = (candidate.Assessment?.Applicability?.SourceRefs ?? [])
+                .Concat(candidate.Assessment?.Conditions.SelectMany(c => c.SourceRefs ?? []) ?? []).Distinct().ToArray();
+            if (references.Length > 64 || references.Any(r => r is null))
+            {
+                return new(Invalid());
+            }
+            foreach (var reference in references)
+            {
+                var resolved = await Material(reference.MaterialId, reference.VersionId);
+                if (resolved.Error is { } error)
+                {
+                    return new(error);
+                }
+                if (resolved.Content!.ContentHash != reference.ContentHash)
+                {
+                    return new(Invalid());
+                }
+            }
+            var draft = new EffectDraft("candidate", "candidate", null, "candidate", "candidate", references,
+                candidate.HasCalculation ? new(new("value", "0"), "unknown", "unknown") : null,
+                new("unknown", "unknown", null, candidate.EvidenceStatus ?? "unknown", 0, 0, 0),
+                new("liquidity", "event_only", "qualitative", "unknown", null, "qualitative"), candidate.Assessment);
+            var result = await ApplicabilityPolicy.Validate(draft, request.CompanyId, Material);
+            if (result.Error is { } validationError)
+            {
+                return new(validationError);
+            }
+        }
+        return new(new
+        {
+            valid = true
+        }, null);
+    }
     public async Task<Result<AnalysisReceipt>> CanonicalCompany(AnalysisScope request)
     {
         if (!Valid(request))

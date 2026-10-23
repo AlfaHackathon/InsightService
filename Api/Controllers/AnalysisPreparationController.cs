@@ -24,4 +24,6 @@ public sealed class AnalysisPreparationController(AnalysisPreparationService ser
     }
     [HttpPost("depth")]
     public async Task<IActionResult> Depth([FromBody] DepthRequest request, CancellationToken ct) => OkOrProblem<object>(await service.Depth(request, ct));
+    [HttpPost("validate-applicability")]
+    public async Task<IActionResult> ValidateApplicability([FromBody] ApplicabilityValidation request, CancellationToken ct) => OkOrProblem<object>(await service.ValidateApplicability(request, ct));
 }

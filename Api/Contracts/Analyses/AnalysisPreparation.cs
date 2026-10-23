@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using InsightService.Contracts.Context;
+using InsightService.Contracts.Questions;
 
 namespace InsightService.Contracts.Analyses;
 
@@ -16,3 +17,5 @@ public sealed record DepthDecisionResponse(string PolicyVersion, string Level, s
     int OwnOriginalCount, bool InventoryCompleteForLoadedScope, SourceRef[] SourceRefs, int[] GeneralInsightIndexes,
     string Applicability, string[] MissingFacts,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] EvidenceRelevance[]? Relevance = null);
+public sealed record ApplicabilityCandidate(QuestionAssessment? Assessment, string? EvidenceStatus, bool HasCalculation);
+public sealed record ApplicabilityValidation(Guid CompanyId, DateTimeOffset AsOf, ApplicabilityCandidate[] Candidates);
