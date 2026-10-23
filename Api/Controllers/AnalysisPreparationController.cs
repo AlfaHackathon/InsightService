@@ -10,20 +10,28 @@ namespace InsightService.Controllers;
 public sealed class AnalysisPreparationController(AnalysisPreparationService service) : BaseController
 {
     [HttpPost("canonical-company")]
-    public async Task<IActionResult> Canonical([FromBody] AnalysisScope request) => OkOrProblem<AnalysisReceipt>(await service.CanonicalCompany(request));
-    [HttpPost("applicability")]
-    public async Task<IActionResult> Applicability([FromBody] AnalysisScope request, CancellationToken ct) => OkOrProblem<AnalysisReceipt>(await service.Applicability(request, ct));
-    [HttpPost("prepare")]
-    public async Task<IActionResult> Prepare([FromBody] DraftPreparation request)
+    public async Task<IActionResult> CanonicalAsync([FromBody] AnalysisScope request)
     {
-        var result = await service.Prepare(request);
-        return result.Error is null ? Ok(new
-        {
-            drafts = result.Content
-        }) : OkOrProblem(result);
+        return OkOrProblem<AnalysisReceipt>(await service.CanonicalCompanyAsync(request));
+    }
+    [HttpPost("applicability")]
+    public async Task<IActionResult> ApplicabilityAsync([FromBody] AnalysisScope request, CancellationToken ct)
+    {
+        return OkOrProblem<AnalysisReceipt>(await service.ApplicabilityAsync(request, ct));
+    }
+    [HttpPost("prepare")]
+    public async Task<IActionResult> PrepareAsync([FromBody] DraftPreparation request)
+    {
+        return OkOrProblem<DraftPreparationResponse>(await service.PrepareAsync(request));
     }
     [HttpPost("depth")]
-    public async Task<IActionResult> Depth([FromBody] DepthRequest request, CancellationToken ct) => OkOrProblem<object>(await service.Depth(request, ct));
+    public async Task<IActionResult> DepthAsync([FromBody] DepthRequest request, CancellationToken ct)
+    {
+        return OkOrProblem<object>(await service.DepthAsync(request, ct));
+    }
     [HttpPost("validate-applicability")]
-    public async Task<IActionResult> ValidateApplicability([FromBody] ApplicabilityValidation request, CancellationToken ct) => OkOrProblem<object>(await service.ValidateApplicability(request, ct));
+    public async Task<IActionResult> ValidateApplicabilityAsync([FromBody] ApplicabilityValidation request, CancellationToken ct)
+    {
+        return OkOrProblem<object>(await service.ValidateApplicabilityAsync(request, ct));
+    }
 }

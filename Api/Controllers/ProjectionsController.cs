@@ -9,9 +9,18 @@ namespace InsightService.Controllers;
 public sealed class ProjectionsController(ProjectionService service) : BaseController
 {
     [HttpPost("groups")]
-    public async Task<IActionResult> Groups([FromBody] ProjectionRequest request, CancellationToken ct) => OkOrProblem<GroupProjectionResponse>(await service.Groups(request, ct));
+    public async Task<IActionResult> GroupsAsync([FromBody] ProjectionRequest request, CancellationToken ct)
+    {
+        return OkOrProblem<GroupProjectionResponse>(await service.GroupsAsync(request, ct));
+    }
     [HttpPost("canonical-facts")]
-    public async Task<IActionResult> Canonical([FromBody] ProjectionRequest request) => OkOrProblem<CanonicalProjection>(await service.Canonical(request));
+    public async Task<IActionResult> CanonicalAsync([FromBody] ProjectionRequest request)
+    {
+        return OkOrProblem<CanonicalProjection>(await service.CanonicalAsync(request));
+    }
     [HttpPost("role")]
-    public async Task<IActionResult> Role([FromBody] RoleProjectionRequest request, CancellationToken ct) => OkOrProblem<RoleProjectionResponse>(await service.Role(request, ct));
+    public async Task<IActionResult> RoleAsync([FromBody] RoleProjectionRequest request, CancellationToken ct)
+    {
+        return OkOrProblem<RoleProjectionResponse>(await service.RoleAsync(request, ct));
+    }
 }

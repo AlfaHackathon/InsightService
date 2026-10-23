@@ -26,6 +26,11 @@ public static class ServiceRegistration
         builder.Services.AddScoped<IAnalysisService, AnalysisService>();
         builder.Services.AddScoped<ProjectionService>();
         builder.Services.AddScoped<AnalysisPreparationService>();
+        builder.Services.AddScoped<ExecutionJobReader>();
+        builder.Services.AddScoped<CompanyExecutionService>();
+        builder.Services.AddScoped<JobProjectionService>();
+        builder.Services.AddScoped<SourceJobPlanningService>();
+        builder.Services.AddScoped<AnalysisSessionService>();
         builder.Services.AddScoped<INewsJobRepository, NewsJobRepository>();
     }
 }

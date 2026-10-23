@@ -8,18 +8,22 @@ using InsightService.Services.Interfaces;
 
 namespace InsightService.Services;
 
-public sealed class AnalysisPreparationService(IEffectRepository repository, IAnalysisService analyses, ISourceResolver sources,
-    ContextEvidenceClient evidence, CompanyKnowledgeClient company)
+public sealed class AnalysisPreparationService(
+    IEffectRepository repository,
+    IAnalysisService analyses,
+    ISourceResolver sources,
+    ContextEvidenceClient evidence,
+    CompanyKnowledgeClient company)
 {
     private static readonly string[] MissingExposure = ["В загруженном корпусе не установлены собственные договорные, имущественные или операционные основания применимости. Это не доказывает отсутствия обязательств."];
-    public async Task<Result<object>> ValidateApplicability(ApplicabilityValidation request, CancellationToken ct)
+    public async Task<Result<object>> ValidateApplicabilityAsync(ApplicabilityValidation request, CancellationToken ct)
     {
         if (request.CompanyId == Guid.Empty || request.AsOf == default || request.Candidates is null || request.Candidates.Length > 32)
         {
             return new(Invalid());
         }
         var cache = new Dictionary<(string, string), Contracts.Context.MaterialVersion>();
-        async Task<Result<Contracts.Context.MaterialVersion>> Material(string materialId, string versionId)
+        async Task<Result<Contracts.Context.MaterialVersion>> MaterialAsync(string materialId, string versionId)
         {
             if (!cache.TryGetValue((materialId, versionId), out var material))
             {
@@ -58,7 +62,7 @@ public sealed class AnalysisPreparationService(IEffectRepository repository, IAn
             }
             foreach (var reference in references)
             {
-                var resolved = await Material(reference.MaterialId, reference.VersionId);
+                var resolved = await MaterialAsync(reference.MaterialId, reference.VersionId);
                 if (resolved.Error is { } error)
                 {
                     return new(error);
@@ -72,7 +76,7 @@ public sealed class AnalysisPreparationService(IEffectRepository repository, IAn
                 candidate.HasCalculation ? new(new("value", "0"), "unknown", "unknown") : null,
                 new("unknown", "unknown", null, candidate.EvidenceStatus ?? "unknown", 0, 0, 0),
                 new("liquidity", "event_only", "qualitative", "unknown", null, "qualitative"), candidate.Assessment);
-            var result = await ApplicabilityPolicy.Validate(draft, request.CompanyId, Material);
+            var result = await ApplicabilityPolicy.Validate(draft, request.CompanyId, MaterialAsync);
             if (result.Error is { } validationError)
             {
                 return new(validationError);
@@ -83,7 +87,7 @@ public sealed class AnalysisPreparationService(IEffectRepository repository, IAn
             valid = true
         }, null);
     }
-    public async Task<Result<AnalysisReceipt>> CanonicalCompany(AnalysisScope request)
+    public async Task<Result<AnalysisReceipt>> CanonicalCompanyAsync(AnalysisScope request)
     {
         if (!Valid(request))
         {
@@ -107,7 +111,7 @@ public sealed class AnalysisPreparationService(IEffectRepository repository, IAn
         return new(stored.Receipt, null);
     }
 
-    public async Task<Result<AnalysisReceipt>> Applicability(AnalysisScope request, CancellationToken ct)
+    public async Task<Result<AnalysisReceipt>> ApplicabilityAsync(AnalysisScope request, CancellationToken ct)
     {
         if (!Valid(request))
         {
@@ -143,7 +147,7 @@ public sealed class AnalysisPreparationService(IEffectRepository repository, IAn
             ContextComplete: false, Trigger: request.Trigger, ExpectedStateVersion: before.StateVersion, Mechanisms: request.Mechanisms), ct);
     }
 
-    public async Task<Result<EffectDraft[]>> Prepare(DraftPreparation input)
+    public async Task<Result<DraftPreparationResponse>> PrepareAsync(DraftPreparation input)
     {
         var request = input.Request;
         if (request is null || request.CompanyId == Guid.Empty || request.AsOf == default || string.IsNullOrWhiteSpace(request.NewsMaterialId) || input.Drafts is null || input.Drafts.Length > 32)
@@ -206,20 +210,18 @@ public sealed class AnalysisPreparationService(IEffectRepository repository, IAn
                 ExpectedPreviousRevisionId = existing?.CurrentRevision.RevisionId
             });
         }
-        return new(drafts.ToArray(), null);
+        return new(new DraftPreparationResponse { Drafts = drafts.ToArray() }, null);
     }
 
-    public async Task<Result<object>> Depth(DepthRequest input, CancellationToken ct)
+    public async Task<Result<object>> DepthAsync(DepthRequest input, CancellationToken ct)
     {
-        var request = input.Request with
-        {
-            CompanyId = input.CompanyId
-        };
+        var request = input.Request;
+        request.CompanyId = input.CompanyId;
         if (!Valid(request))
         {
             return new(Invalid());
         }
-        var inventoryResult = await evidence.Inventory(input.CompanyId, request.AsOf, ct);
+        var inventoryResult = await evidence.InventoryAsync(input.CompanyId, request.AsOf, ct);
         if (inventoryResult.Error is { } inventoryError)
         {
             return new(inventoryError);
@@ -252,7 +254,7 @@ public sealed class AnalysisPreparationService(IEffectRepository repository, IAn
         }
         var snapshot = await repository.GetSnapshot(input.CompanyId, request.NewsMaterialId, request.AsOf);
         var mechanisms = input.Plan.TryGetProperty("mechanisms", out var mechanismElement) ? mechanismElement.EnumerateArray().Select(x => x.GetString()!).ToArray() : null;
-        var profile = await company.Profile(input.CompanyId, request.AsOf, ct);
+        var profile = await company.ProfileAsync(input.CompanyId, request.AsOf, ct);
         if (profile.Error is { } profileError && profileError.HttpStatusCode != HttpStatusCode.NotFound)
         {
             return new(profileError);
@@ -264,10 +266,19 @@ public sealed class AnalysisPreparationService(IEffectRepository repository, IAn
         var reason = request.ProjectionOnly ? "projection_refresh" : request.Trigger is not null ? "source_revision" : input.NewsCorrection ? "news_correction" :
             snapshot.Effects.Any(e => Relevant(e, mechanisms)) ? "prior_canonical_state" : !inventory.CompleteForLoadedScope ? "incomplete_inventory" : own.Length > 0 ? irrelevant ? "unrelated_evidence" : "own_originals" : profile.Content is not null || inventory.Sources.Length > 0 ? "profile_only" : "no_own_evidence";
         var level = reason == "projection_refresh" ? "canonical_projection" : reason is "profile_only" or "unrelated_evidence" ? "applicability" : reason == "no_own_evidence" ? "general" : "company_deep";
-        return new(new DepthDecisionResponse("evidence-depth-v1", level, reason, own.Length, inventory.CompleteForLoadedScope,
-            inventory.Sources.Select(s => new Contracts.Context.SourceRef(s.MaterialId, s.VersionId, s.ContentHash)).ToArray(),
-            input.Plan.TryGetProperty("generalInsights", out var insights) ? Enumerable.Range(0, insights.GetArrayLength()).ToArray() : [],
-            "unknown", level is "general" or "applicability" ? MissingExposure : [], input.Relevance), null);
+        return new(new DepthDecisionResponse
+        {
+            PolicyVersion = "evidence-depth-v1",
+            Level = level,
+            Reason = reason,
+            OwnOriginalCount = own.Length,
+            InventoryCompleteForLoadedScope = inventory.CompleteForLoadedScope,
+            SourceRefs = inventory.Sources.Select(s => new Contracts.Context.SourceRef(s.MaterialId, s.VersionId, s.ContentHash)).ToArray(),
+            GeneralInsightIndexes = input.Plan.TryGetProperty("generalInsights", out var insights) ? Enumerable.Range(0, insights.GetArrayLength()).ToArray() : [],
+            Applicability = "unknown",
+            MissingFacts = level is "general" or "applicability" ? MissingExposure : [],
+            Relevance = input.Relevance
+        }, null);
     }
 
     private static bool Relevant(EffectResponse effect, string[]? mechanisms) => mechanisms is not { Length: > 0 } || effect.CurrentRevision.Question is null || mechanisms.Contains(effect.CurrentRevision.Question.Mechanism, StringComparer.Ordinal);

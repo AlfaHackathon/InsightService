@@ -8,9 +8,12 @@ using InsightService.Services.Interfaces;
 
 namespace InsightService.Services;
 
-public sealed class ProjectionService(IEffectRepository repository, CompanyKnowledgeClient company, ISourceResolver sources)
+public sealed class ProjectionService(
+    IEffectRepository repository,
+    CompanyKnowledgeClient company,
+    ISourceResolver sources)
 {
-    public async Task<Result<CanonicalProjection>> Canonical(ProjectionRequest request)
+    public async Task<Result<CanonicalProjection>> CanonicalAsync(ProjectionRequest request)
     {
         if (request.Companies is null || request.Companies.Length > 10000 || request.Companies.Any(c => c.CompanyId == Guid.Empty) || request.AsOf == default(DateTimeOffset))
         {
@@ -21,14 +24,14 @@ public sealed class ProjectionService(IEffectRepository repository, CompanyKnowl
         {
             if (run.Receipt is not { } identity)
             {
-                companies.Add(new(run.CompanyId, "failed", Error: "NO_CANONICAL_STATE"));
+                companies.Add(new() { CompanyId = run.CompanyId, Status = "failed", Error = "NO_CANONICAL_STATE" });
                 continue;
             }
             var asOf = request.AsOf ?? identity.AsOf;
             var stored = await repository.FindAnalysis(run.CompanyId, identity.NewsMaterialId, identity.NewsVersionId, identity.Trigger);
             if (stored is null || stored.Receipt.AsOf > asOf)
             {
-                companies.Add(new(run.CompanyId, "failed", Error: "NO_CANONICAL_STATE"));
+                companies.Add(new() { CompanyId = run.CompanyId, Status = "failed", Error = "NO_CANONICAL_STATE" });
                 continue;
             }
             var receipt = stored.Receipt;
@@ -42,11 +45,14 @@ public sealed class ProjectionService(IEffectRepository repository, CompanyKnowl
                     heads[effect.EffectId] = new(effect.EffectId, revision.RevisionId, revision.PreviousRevisionId, false, revision);
                 }
             }
-            companies.Add(new(run.CompanyId, "completed", receipt with
+            companies.Add(new()
             {
-                Effects = heads.Values.ToArray()
-            },
-                ContextComplete: receipt.ContextComplete, StaleEffectIds: snapshot.Effects.Where(e => e.RequiresReassessment).Select(e => e.EffectId).ToArray()));
+                CompanyId = run.CompanyId,
+                Status = "completed",
+                Receipt = receipt with { Effects = heads.Values.ToArray() },
+                ContextComplete = receipt.ContextComplete,
+                StaleEffectIds = snapshot.Effects.Where(e => e.RequiresReassessment).Select(e => e.EffectId).ToArray()
+            });
         }
         var facts = companies.SelectMany(c => c.Receipt?.Effects.Select(e =>
         {
@@ -62,35 +68,35 @@ public sealed class ProjectionService(IEffectRepository repository, CompanyKnowl
                     Conclusion = QuestionIdentityPolicy.CalculatedConclusion(revision.Question?.Frame ?? "absolute", value, calculation.Unit, calculation.Period, "")
                 };
             }
-            return new CanonicalFact(c.CompanyId, e.EffectId, revision, stale ? 0 : ProjectionPolicy.Priority(revision), stale);
+            return new CanonicalFact { CompanyId = c.CompanyId, EffectId = e.EffectId, Revision = revision, Priority = stale ? 0 : ProjectionPolicy.Priority(revision), RequiresReassessment = stale };
         }) ?? []).OrderByDescending(f => f.Priority).ToArray();
-        return new(new CanonicalProjection(companies.ToArray(), facts), null);
+        return new(new CanonicalProjection { Companies = companies.ToArray(), Facts = facts }, null);
     }
 
-    public async Task<Result<GroupProjectionResponse>> Groups(ProjectionRequest request, CancellationToken ct)
+    public async Task<Result<GroupProjectionResponse>> GroupsAsync(ProjectionRequest request, CancellationToken ct)
     {
-        var canonical = await Canonical(request);
+        var canonical = await CanonicalAsync(request);
         if (canonical.Error is { } error)
         {
             return new(error);
         }
 
-        var groups = await ResolveGroups(request.Groups ?? [], request.AsOf ?? request.Companies.Select(c => c.Receipt?.AsOf ?? DateTimeOffset.MinValue).DefaultIfEmpty(DateTimeOffset.UtcNow).Max(), ct);
+        var groups = await ResolveGroupsAsync(request.Groups ?? [], request.AsOf ?? request.Companies.Select(c => c.Receipt?.AsOf ?? DateTimeOffset.MinValue).DefaultIfEmpty(DateTimeOffset.UtcNow).Max(), ct);
         if (groups.Error is { } groupError)
         {
             return new(groupError);
         }
 
-        return new(new GroupProjectionResponse(groups.Content!.Select(g => ProjectionPolicy.Group(g, canonical.Content!.Companies)).ToArray()), null);
+        return new(new GroupProjectionResponse { Groups = groups.Content!.Select(g => ProjectionPolicy.Group(g, canonical.Content!.Companies)).ToArray() }, null);
     }
 
-    public async Task<Result<RoleProjectionResponse>> Role(RoleProjectionRequest request, CancellationToken ct)
+    public async Task<Result<RoleProjectionResponse>> RoleAsync(RoleProjectionRequest request, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(request.PersonId) || request.PersonId.Length > 200 || request.AsOf == default || request.CompanyId == Guid.Empty)
         {
             return new(InvalidRequest());
         }
-        var scope = await company.Role(request.PersonId, request.CompanyId, request.AsOf, ct);
+        var scope = await company.RoleAsync(request.PersonId, request.CompanyId, request.AsOf, ct);
         if (scope.Error is { } scopeError)
         {
             return new(scopeError);
@@ -102,7 +108,7 @@ public sealed class ProjectionService(IEffectRepository repository, CompanyKnowl
         {
             return new(new Error("CompanyService returned an invalid role scope.", ErrorSource.External, ErrorType.Undefined) { HttpStatusCode = HttpStatusCode.BadGateway });
         }
-        var canonical = await Canonical(new(request.Companies, request.Groups, request.AsOf));
+        var canonical = await CanonicalAsync(new() { Companies = request.Companies, Groups = request.Groups, AsOf = request.AsOf });
         if (canonical.Error is { } error)
         {
             return new(error);
@@ -110,7 +116,7 @@ public sealed class ProjectionService(IEffectRepository repository, CompanyKnowl
 
         var allowed = role.AllowedCompanyIds.ToHashSet();
         var cache = new Dictionary<(string, string), Contracts.Context.MaterialVersion>();
-        async Task<Result<bool>> CanRead(Contracts.Context.SourceRef[] refs)
+        async Task<Result<bool>> CanReadAsync(Contracts.Context.SourceRef[] refs)
         {
             foreach (var reference in refs)
             {
@@ -139,7 +145,7 @@ public sealed class ProjectionService(IEffectRepository repository, CompanyKnowl
         var visible = new List<CanonicalFact>();
         foreach (var fact in eligible)
         {
-            var read = await CanRead(fact.Revision.SourceRefs);
+            var read = await CanReadAsync(fact.Revision.SourceRefs);
             if (read.Error is { } readError)
             {
                 return new(readError);
@@ -150,7 +156,7 @@ public sealed class ProjectionService(IEffectRepository repository, CompanyKnowl
                 visible.Add(fact);
             }
         }
-        var expansions = await ResolveGroups(request.Groups ?? [], request.AsOf, ct);
+        var expansions = await ResolveGroupsAsync(request.Groups ?? [], request.AsOf, ct);
         if (expansions.Error is { } expansionError)
         {
             return new(expansionError);
@@ -171,7 +177,7 @@ public sealed class ProjectionService(IEffectRepository repository, CompanyKnowl
                 continue;
             }
 
-            var read = await CanRead(group.SourceRefs);
+            var read = await CanReadAsync(group.SourceRefs);
             if (read.Error is { } readError)
             {
                 return new(readError);
@@ -182,10 +188,13 @@ public sealed class ProjectionService(IEffectRepository repository, CompanyKnowl
                 groups.Add(projection);
             }
         }
-        return new(new RoleProjectionResponse(new(role.PersonId, role.CompanyId, role.Role, role.Responsibilities), visible.ToArray(), groups.ToArray()), null);
+        return new(new RoleProjectionResponse { Profile = new() { PersonId = role.PersonId, CompanyId = role.CompanyId, Role = role.Role, Responsibilities = role.Responsibilities }, Facts = visible.ToArray(), Groups = groups.ToArray() }, null);
     }
 
-    private async Task<Result<GroupExpansion[]>> ResolveGroups(GroupExpansion[] requested, DateTimeOffset asOf, CancellationToken ct)
+    private async Task<Result<GroupExpansion[]>> ResolveGroupsAsync(
+        GroupExpansion[] requested,
+        DateTimeOffset asOf,
+        CancellationToken ct)
     {
         if (requested.Length > 64 || requested.Any(g => string.IsNullOrWhiteSpace(g.GroupId) || g.GroupId.Length > 200))
         {
@@ -195,7 +204,7 @@ public sealed class ProjectionService(IEffectRepository repository, CompanyKnowl
         var result = new List<GroupExpansion>();
         foreach (var input in requested.DistinctBy(g => g.GroupId))
         {
-            var resolved = await company.Group(input.GroupId, asOf, ct);
+            var resolved = await company.GroupAsync(input.GroupId, asOf, ct);
             if (resolved.Error is { } error)
             {
                 return new(error);

@@ -4,13 +4,22 @@ using AlfaHackaton.HttpClient.Common.Interfaces;
 using AlfaHackaton.Result;
 using AlfaHackaton.Result.Errors;
 using InsightService.Contracts.Analyses;
+using InsightService.Contracts.Execution;
 using InsightService.Settings;
 
 namespace InsightService.Services;
 
 public sealed class ContextEvidenceClient(IHttpClient<ContextHttpSettings> client, IConfiguration configuration)
 {
-    public async Task<Result<DepthInventory>> Inventory(Guid companyId, DateTimeOffset asOf, CancellationToken ct)
+    public Task<Result<DepthInventory>> InventoryAsync(
+        Guid companyId,
+        DateTimeOffset asOf,
+        CancellationToken ct) =>
+        GetAsync<DepthInventory>($"companies/{companyId:D}/evidence?asOf=" + Uri.EscapeDataString(asOf.ToString("O", CultureInfo.InvariantCulture)), ct);
+    public Task<Result<SourceEventPage>> ChangesAsync(long after, CancellationToken ct) =>
+        GetAsync<SourceEventPage>($"changes?after={after.ToString(CultureInfo.InvariantCulture)}", ct);
+
+    private async Task<Result<T>> GetAsync<T>(string path, CancellationToken ct)
     {
         var secret = configuration["ContextService:InternalSecret"] ?? configuration["Internal:Secret"];
         if (!Uri.TryCreate(configuration["ContextService:BaseUrl"], UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https") || string.IsNullOrEmpty(secret))
@@ -19,8 +28,8 @@ public sealed class ContextEvidenceClient(IHttpClient<ContextHttpSettings> clien
         }
         try
         {
-            var url = uri.ToString().TrimEnd('/') + $"/context-service/internal/companies/{companyId:D}/evidence?asOf=" + Uri.EscapeDataString(asOf.ToString("O", CultureInfo.InvariantCulture));
-            var response = await client.Get<DepthInventory>(url, (headers, _) => headers.Add("X-Internal-Secret", secret), ct);
+            var url = uri.ToString().TrimEnd('/') + "/context-service/internal/" + path;
+            var response = await client.Get<T>(url, (headers, _) => headers.Add("X-Internal-Secret", secret), ct);
             if (!response.IsSuccessStatusCode || response.Result is null)
             {
                 return new(Failure("ContextService rejected evidence inventory resolution.", HttpStatusCode.BadGateway));

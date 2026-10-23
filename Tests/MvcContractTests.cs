@@ -55,8 +55,8 @@ public sealed class MvcContractTests : IDisposable
         var facts = (await projection.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("facts");
         Assert.Equal("9007199254740993.11", facts[0].GetProperty("revision").GetProperty("calculationResult").GetString());
         Assert.Equal(100, facts[0].GetProperty("priority").GetInt32());
-        var total = ProjectionPolicy.Group(new("group", [company], [], [], true, [], "sum_compatible_owner_effects"),
-            [new(company, "completed", saved, ContextComplete: true)]).Totals.Single();
+        var total = ProjectionPolicy.Group(new() { GroupId = "group", CompanyIds = [company], Complete = true, AggregationRule = "sum_compatible_owner_effects" },
+            [new() { CompanyId = company, Status = "completed", Receipt = saved, ContextComplete = true }]).Totals.Single();
         Assert.Equal("9007199254740993.11", total.FullTotal);
 
         using var prepare = await client.PostAsJsonAsync("/insight-service/internal/analyses/prepare", new

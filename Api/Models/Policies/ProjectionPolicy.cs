@@ -82,12 +82,43 @@ public static class ProjectionPolicy
             var complete = group.Complete && missing.Length == 0 && partial.Length == 0 && empty.Length == 0 && unresolved.Length == 0 && duplicateFrame.Length == 0 && absent.Length == 0 &&
                 (q is null || q.Basis is not (null or "unknown") && q.Unit != "unknown" && q.TargetPeriod != "unknown" && q.BaselinePeriod != "unknown");
             var sum = Sum(frame.Values);
-            return new GroupTotal(frame.Identity.Metric, frame.Identity.AmountBasis, frame.Identity.Unit, frame.Identity.Period, q, sum, complete ? sum : null,
-                new(complete, absent, unresolved, duplicateFrame), frame.Effects.ToArray(), frame.Companies.Distinct().ToArray());
+            return new GroupTotal
+            {
+                Metric = frame.Identity.Metric,
+                AmountBasis = frame.Identity.AmountBasis,
+                Unit = frame.Identity.Unit,
+                Period = frame.Identity.Period,
+                Question = q,
+                KnownSubtotal = sum,
+                FullTotal = complete ? sum : null,
+                Coverage = new() { Complete = complete, MissingCompanyIds = absent, UnresolvedEffectIds = unresolved, DuplicateObjects = duplicateFrame },
+                EffectIds = frame.Effects.ToArray(),
+                CompanyIds = frame.Companies.Distinct().ToArray()
+            };
         }).ToArray() : [];
         var coverageComplete = group.Complete && confirmed && partial.Length == 0 && missing.Length == 0 && unknown.Count == 0 && duplicates.Count == 0 && unrevised.Length == 0 && empty.Length == 0;
-        return new(group.GroupId, group.CompanyIds.Distinct().ToArray(), coverageComplete && totals.All(t => t.Coverage.Complete),
-            new(group.CompanyIds.Length, group.CompanyIds.Length - missing.Length, missing, group.MissingGroups, group.Cycles, unknown.ToArray(), duplicates.ToArray(), unrevised, empty, partial, confirmed), totals, group.SourceRefs);
+        return new()
+        {
+            GroupId = group.GroupId,
+            CompanyIds = group.CompanyIds.Distinct().ToArray(),
+            Complete = coverageComplete && totals.All(t => t.Coverage.Complete),
+            Coverage = new()
+            {
+                ExpectedCompanies = group.CompanyIds.Length,
+                AnalyzedCompanies = group.CompanyIds.Length - missing.Length,
+                MissingCompanyIds = missing,
+                MissingGroups = group.MissingGroups,
+                Cycles = group.Cycles,
+                UnknownEffects = unknown.ToArray(),
+                DuplicateObjects = duplicates.ToArray(),
+                UnrevisedEffectIds = unrevised,
+                EmptyCompanyIds = empty,
+                PartialContextCompanyIds = partial,
+                AggregationRuleConfirmed = confirmed
+            },
+            Totals = totals,
+            SourceRefs = group.SourceRefs
+        };
     }
 
     private static bool Related(QuestionIdentity? candidate, QuestionIdentity? frame) => candidate is null || frame is null ||
