@@ -1,0 +1,10 @@
+**/.git
+**/bin
+**/obj
+**/.env
+**/.env.*
+**/.github-token
+**/node_modules
+Tests
+models
+*.user
