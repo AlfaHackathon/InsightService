@@ -6,4 +6,3 @@ public sealed class RoleProjectionResponse
     public CanonicalFact[] Facts { get; set; } = [];
     public GroupProjection[] Groups { get; set; } = [];
 }
-

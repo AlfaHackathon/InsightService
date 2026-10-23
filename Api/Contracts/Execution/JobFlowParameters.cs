@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using InsightService.Contracts.Analyses;
+
 namespace InsightService.Contracts.Execution;
 
 public sealed class JobFlowParameters
@@ -18,4 +19,3 @@ public sealed class JobFlowParameters
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public MaterialTrigger? Trigger { get; set; }
 }
-

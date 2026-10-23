@@ -4,4 +4,3 @@ public sealed class SourceEventPage
 {
     public SourceEvent[] Changes { get; set; } = [];
 }
-

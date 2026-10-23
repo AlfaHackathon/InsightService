@@ -7,4 +7,3 @@ public sealed class VisibleRoleProfile
     public string Role { get; set; } = string.Empty;
     public string[] Responsibilities { get; set; } = [];
 }
-

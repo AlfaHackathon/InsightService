@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+
 namespace InsightService.Contracts.Projections;
 
 public sealed class ProjectionRequest
@@ -8,4 +9,3 @@ public sealed class ProjectionRequest
     public GroupExpansion[]? Groups { get; set; }
     public DateTimeOffset? AsOf { get; set; }
 }
-

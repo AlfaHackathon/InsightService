@@ -9,4 +9,3 @@ public sealed class SourceEvent
     public DateTimeOffset KnownAt { get; set; }
     public Guid[] CompanyIds { get; set; } = [];
 }
-

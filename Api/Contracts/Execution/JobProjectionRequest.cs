@@ -1,4 +1,5 @@
 using System.Text.Json;
+
 namespace InsightService.Contracts.Execution;
 
 public sealed class JobProjectionRequest
@@ -7,4 +8,3 @@ public sealed class JobProjectionRequest
     public bool SegmentCoverageAvailable { get; set; }
     public JsonElement[]? RoleViews { get; set; }
 }
-

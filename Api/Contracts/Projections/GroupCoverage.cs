@@ -14,4 +14,3 @@ public sealed class GroupCoverage
     public Guid[] PartialContextCompanyIds { get; set; } = [];
     public bool AggregationRuleConfirmed { get; set; }
 }
-

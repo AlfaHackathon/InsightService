@@ -1,6 +1,7 @@
 using System.Text.Json.Nodes;
 using InsightService.Contracts.Analyses;
 using InsightService.Contracts.Context;
+
 namespace InsightService.Contracts.Execution;
 
 public sealed class CompanyPlanResponse
@@ -14,4 +15,3 @@ public sealed class CompanyPlanResponse
     public AnalysisReceipt? Receipt { get; set; }
     public string[] SegmentKeys { get; set; } = [];
 }
-

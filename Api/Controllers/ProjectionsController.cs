@@ -2,6 +2,7 @@ using AlfaHackaton.Controllers.Controllers;
 using InsightService.Contracts.Projections;
 using InsightService.Services;
 using Microsoft.AspNetCore.Mvc;
+
 namespace InsightService.Controllers;
 
 [ApiController]

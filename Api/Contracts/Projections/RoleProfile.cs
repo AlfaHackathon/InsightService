@@ -1,4 +1,5 @@
 using InsightService.Contracts.Context;
+
 namespace InsightService.Contracts.Projections;
 
 public sealed class RoleProfile
@@ -13,4 +14,3 @@ public sealed class RoleProfile
     public SourceRef[] SourceRefs { get; set; } = [];
     public string RevisionId { get; set; } = string.Empty;
 }
-

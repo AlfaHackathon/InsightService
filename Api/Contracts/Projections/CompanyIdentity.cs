@@ -6,4 +6,3 @@ public sealed class CompanyIdentity
     public DateTimeOffset KnownAt { get; set; }
     public string? BankProfileId { get; set; }
 }
-

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using InsightService.Contracts.Projections;
+
 namespace InsightService.Contracts.Execution;
 
 public sealed class JobExecutionCheckpoint
@@ -14,4 +15,3 @@ public sealed class JobExecutionCheckpoint
     public CompanyProjection[] Companies { get; set; } = [];
     public JsonElement[] RoleViews { get; set; } = [];
 }
-

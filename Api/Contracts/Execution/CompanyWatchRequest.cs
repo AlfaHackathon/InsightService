@@ -6,4 +6,3 @@ public sealed class CompanyWatchRequest
     public Guid CompanyId { get; set; }
     public long AfterSequence { get; set; }
 }
-

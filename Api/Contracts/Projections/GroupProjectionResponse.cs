@@ -4,4 +4,3 @@ public sealed class GroupProjectionResponse
 {
     public GroupProjection[] Groups { get; set; } = [];
 }
-

@@ -1,4 +1,5 @@
 using InsightService.Contracts.Analyses;
+
 namespace InsightService.Contracts.Projections;
 
 public sealed class CompanyProjection
@@ -10,4 +11,3 @@ public sealed class CompanyProjection
     public bool? ContextComplete { get; set; }
     public string[]? StaleEffectIds { get; set; }
 }
-

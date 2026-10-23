@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+
 namespace InsightService.Contracts.Analyses;
 
 public sealed class DepthRequest
@@ -13,4 +14,3 @@ public sealed class DepthRequest
     public bool NewsCorrection { get; set; }
     public EvidenceRelevance[]? Relevance { get; set; }
 }
-

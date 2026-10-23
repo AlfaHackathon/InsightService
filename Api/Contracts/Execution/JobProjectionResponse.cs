@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using InsightService.Contracts.Projections;
+
 namespace InsightService.Contracts.Execution;
 
 public sealed class JobProjectionResponse
@@ -9,4 +10,3 @@ public sealed class JobProjectionResponse
     public JsonObject[] RoleViews { get; set; } = [];
     public JsonObject Result { get; set; } = new();
 }
-

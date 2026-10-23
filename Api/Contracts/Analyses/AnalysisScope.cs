@@ -11,4 +11,3 @@ public sealed class AnalysisScope
     public string[]? Mechanisms { get; set; }
     public bool ProjectionOnly { get; set; }
 }
-

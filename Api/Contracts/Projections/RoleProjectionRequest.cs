@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+
 namespace InsightService.Contracts.Projections;
 
 public sealed class RoleProjectionRequest
@@ -10,4 +11,3 @@ public sealed class RoleProjectionRequest
     public CompanyProjection[] Companies { get; set; } = [];
     public GroupExpansion[]? Groups { get; set; }
 }
-

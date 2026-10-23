@@ -8,4 +8,3 @@ public sealed class DepthInventory
     public DepthSource[] Sources { get; set; } = [];
     public long WatchAfterSequence { get; set; }
 }
-

@@ -7,4 +7,3 @@ public sealed class TotalCoverage
     public string[] UnresolvedEffectIds { get; set; } = [];
     public string[] DuplicateObjects { get; set; } = [];
 }
-

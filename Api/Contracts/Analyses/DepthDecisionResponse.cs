@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using InsightService.Contracts.Context;
+
 namespace InsightService.Contracts.Analyses;
 
 public sealed class DepthDecisionResponse
@@ -16,4 +17,3 @@ public sealed class DepthDecisionResponse
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public EvidenceRelevance[]? Relevance { get; set; }
 }
-

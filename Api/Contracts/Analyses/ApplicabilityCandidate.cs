@@ -1,4 +1,5 @@
 using InsightService.Contracts.Questions;
+
 namespace InsightService.Contracts.Analyses;
 
 public sealed class ApplicabilityCandidate
@@ -7,4 +8,3 @@ public sealed class ApplicabilityCandidate
     public string? EvidenceStatus { get; set; }
     public bool HasCalculation { get; set; }
 }
-

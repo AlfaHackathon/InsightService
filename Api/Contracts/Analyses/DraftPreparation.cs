@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+
 namespace InsightService.Contracts.Analyses;
 
 public sealed class DraftPreparation
@@ -9,4 +10,3 @@ public sealed class DraftPreparation
     public EffectDraft[] Drafts { get; set; } = [];
     public long? ExpectedStateVersion { get; set; }
 }
-

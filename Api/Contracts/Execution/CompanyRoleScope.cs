@@ -1,4 +1,5 @@
 using InsightService.Contracts.Projections;
+
 namespace InsightService.Contracts.Execution;
 
 public sealed class CompanyRoleScope
@@ -7,4 +8,3 @@ public sealed class CompanyRoleScope
     public string[] MissingPersonIds { get; set; } = [];
     public Guid[] CompanyIds { get; set; } = [];
 }
-

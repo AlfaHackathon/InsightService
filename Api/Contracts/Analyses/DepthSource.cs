@@ -8,4 +8,3 @@ public sealed class DepthSource
     public string SourceId { get; set; } = string.Empty;
     public DateTimeOffset KnownAt { get; set; }
 }
-

@@ -1,4 +1,5 @@
 using InsightService.Contracts.Projections;
+
 namespace InsightService.Contracts.Execution;
 
 public sealed class RoleReasoningScope
@@ -9,4 +10,3 @@ public sealed class RoleReasoningScope
     public CanonicalFact[] Facts { get; set; } = [];
     public GroupProjection[] Groups { get; set; } = [];
 }
-

@@ -5,6 +5,7 @@ using InsightService.Services;
 using InsightService.Services.Interfaces;
 using InsightService.Settings;
 using Microsoft.AspNetCore.Mvc;
+
 namespace InsightService.Extensions;
 
 public static class ServiceRegistration

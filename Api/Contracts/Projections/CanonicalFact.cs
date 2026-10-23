@@ -1,4 +1,5 @@
 using InsightService.Contracts.Analyses;
+
 namespace InsightService.Contracts.Projections;
 
 public sealed class CanonicalFact
@@ -9,4 +10,3 @@ public sealed class CanonicalFact
     public int Priority { get; set; }
     public bool RequiresReassessment { get; set; }
 }
-

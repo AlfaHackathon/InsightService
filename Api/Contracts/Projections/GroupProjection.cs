@@ -1,4 +1,5 @@
 using InsightService.Contracts.Context;
+
 namespace InsightService.Contracts.Projections;
 
 public sealed class GroupProjection
@@ -10,4 +11,3 @@ public sealed class GroupProjection
     public GroupTotal[] Totals { get; set; } = [];
     public SourceRef[] SourceRefs { get; set; } = [];
 }
-

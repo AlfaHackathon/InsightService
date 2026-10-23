@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+
 namespace InsightService.Contracts.Analyses;
 
 public sealed class ApplicabilityValidation
@@ -8,4 +9,3 @@ public sealed class ApplicabilityValidation
     [JsonRequired]
     public ApplicabilityCandidate[] Candidates { get; set; } = [];
 }
-

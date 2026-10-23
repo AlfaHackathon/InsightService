@@ -1,4 +1,5 @@
 using InsightService.Contracts.Questions;
+
 namespace InsightService.Contracts.Projections;
 
 public sealed class GroupTotal
@@ -14,4 +15,3 @@ public sealed class GroupTotal
     public string[] EffectIds { get; set; } = [];
     public Guid[] CompanyIds { get; set; } = [];
 }
-

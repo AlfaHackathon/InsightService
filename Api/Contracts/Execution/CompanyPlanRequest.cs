@@ -1,4 +1,5 @@
 using InsightService.Contracts.Analyses;
+
 namespace InsightService.Contracts.Execution;
 
 public sealed class CompanyPlanRequest
@@ -7,4 +8,3 @@ public sealed class CompanyPlanRequest
     public Guid CompanyId { get; set; }
     public EvidenceRelevance[]? Relevance { get; set; }
 }
-

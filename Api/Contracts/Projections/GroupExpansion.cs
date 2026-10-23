@@ -1,4 +1,5 @@
 using InsightService.Contracts.Context;
+
 namespace InsightService.Contracts.Projections;
 
 public sealed class GroupExpansion
@@ -11,4 +12,3 @@ public sealed class GroupExpansion
     public SourceRef[] SourceRefs { get; set; } = [];
     public string? AggregationRule { get; set; }
 }
-

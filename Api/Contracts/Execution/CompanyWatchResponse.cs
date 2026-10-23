@@ -6,4 +6,3 @@ public sealed class CompanyWatchResponse
     public long AfterSequence { get; set; }
     public bool Complete { get; set; }
 }
-
