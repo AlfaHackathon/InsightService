@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+<resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+<resheader name="version"><value>2.0</value></resheader>
+<data name="ReadQuestionHead" xml:space="preserve"><value>SELECT effect_key AS "EffectKey",company_id::uuid AS "CompanyId",bank_profile_id AS "BankProfileId",news_material_id AS "NewsMaterialId",literal_object_ref AS "LiteralObjectRef",current_revision_id AS "CurrentRevisionId" FROM questions WHERE effect_id=@id</value></data>
+<data name="ReadEffectHead" xml:space="preserve"><value>SELECT effect_key AS "EffectKey",company_id::uuid AS "CompanyId",bank_profile_id AS "BankProfileId",news_material_id AS "NewsMaterialId",literal_object_ref AS "LiteralObjectRef",current_revision_id AS "CurrentRevisionId" FROM effects WHERE effect_id=@id</value></data>
+<data name="ReadQuestionHistory" xml:space="preserve"><value>SELECT payload_json FROM question_revisions WHERE effect_id=@id ORDER BY sequence</value></data>
+<data name="ReadEffectHistory" xml:space="preserve"><value>SELECT payload_json FROM effect_revisions WHERE effect_id=@id ORDER BY sequence</value></data>
+<data name="HasPendingInvalidation" xml:space="preserve"><value>SELECT EXISTS(SELECT 1 FROM question_validity_events e WHERE e.effect_id=@id AND e.known_ticks&lt;=@asof AND e.kind='invalidated'
+  AND NOT EXISTS(SELECT 1 FROM question_validity_events n WHERE n.effect_id=e.effect_id AND n.material_id=e.material_id
+    AND n.known_ticks&lt;=@asof AND (n.known_ticks&gt;e.known_ticks OR (n.known_ticks=e.known_ticks AND n.event_id&gt;e.event_id))))</value></data>
+<data name="InitializeNewsJobs" xml:space="preserve"><value>CREATE TABLE IF NOT EXISTS news_jobs (
+    job_id TEXT PRIMARY KEY, request_hash TEXT NOT NULL, status TEXT NOT NULL,
+    version BIGINT NOT NULL, worker TEXT, lease_ticks BIGINT, updated_ticks BIGINT NOT NULL,
+    payload TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS ix_news_jobs_queue ON news_jobs(status,lease_ticks,updated_ticks);
+CREATE TABLE IF NOT EXISTS news_job_events (job_id TEXT NOT NULL, version BIGINT NOT NULL,
+    payload TEXT NOT NULL, PRIMARY KEY(job_id,version));
+CREATE TABLE IF NOT EXISTS source_cursor (id BIGINT PRIMARY KEY CHECK(id=1), version BIGINT NOT NULL, payload TEXT NOT NULL);</value></data>
+<data name="FindJobRequest" xml:space="preserve"><value>SELECT request_hash AS "RequestHash",payload AS "Payload" FROM news_jobs WHERE job_id=@id</value></data>
+<data name="InitializeNamedSourceCursors" xml:space="preserve"><value>CREATE TABLE IF NOT EXISTS named_source_cursors (source TEXT PRIMARY KEY, version BIGINT NOT NULL, payload TEXT NOT NULL)</value></data>
+<data name="ReadNamedSourceCursor" xml:space="preserve"><value>SELECT payload FROM named_source_cursors WHERE source=@source</value></data>
+<data name="ReadNamedSourceCursorVersion" xml:space="preserve"><value>SELECT version FROM named_source_cursors WHERE source=@source</value></data>
+<data name="UpsertNamedSourceCursor" xml:space="preserve"><value>INSERT INTO named_source_cursors VALUES(@source,@v,@p) ON CONFLICT(source) DO UPDATE SET version=excluded.version,payload=excluded.payload</value></data>
+<data name="ReadSourceCursor" xml:space="preserve"><value>SELECT payload FROM source_cursor WHERE id=1</value></data>
+<data name="ReadSourceCursorVersion" xml:space="preserve"><value>SELECT version FROM source_cursor WHERE id=1</value></data>
+<data name="UpsertSourceCursor" xml:space="preserve"><value>INSERT INTO source_cursor VALUES(1,@v,@p) ON CONFLICT(id) DO UPDATE SET version=excluded.version,payload=excluded.payload</value></data>
+<data name="FindClaimableJob" xml:space="preserve"><value>SELECT job_id FROM news_jobs WHERE (status IN ('queued','partial') OR (status='running' AND lease_ticks&lt;@now)) ORDER BY updated_ticks LIMIT 1</value></data>
+<data name="FindClaimableJobById" xml:space="preserve"><value>SELECT job_id FROM news_jobs WHERE (status IN ('queued','partial') OR (status='running' AND lease_ticks&lt;@now)) AND job_id=@id ORDER BY updated_ticks LIMIT 1</value></data>
+<data name="ReadJob" xml:space="preserve"><value>SELECT payload FROM news_jobs WHERE job_id=@id</value></data>
+<data name="InsertJob" xml:space="preserve"><value>INSERT INTO news_jobs VALUES(@id,@hash,@s,@v,@w,@l,@t,@p)</value></data>
+<data name="UpdateJob" xml:space="preserve"><value>UPDATE news_jobs SET status=@s,version=@v,worker=@w,lease_ticks=@l,updated_ticks=@t,payload=@p WHERE job_id=@id</value></data>
+<data name="InsertJobEvent" xml:space="preserve"><value>INSERT INTO news_job_events VALUES(@id,@v,@p)</value></data>
+<data name="FindAffectedQuestions" xml:space="preserve"><value>SELECT q.effect_id FROM questions q JOIN question_revisions r ON r.revision_id=q.current_revision_id
+WHERE q.effect_id&gt;@after AND (insight_utc_ticks((r.payload_json::jsonb #&gt;&gt; '{asOf}'))&lt;=@time OR
+  (@projection=1 AND EXISTS(SELECT 1 FROM question_revisions h WHERE h.effect_id=q.effect_id AND insight_utc_ticks((h.payload_json::jsonb #&gt;&gt; '{asOf}'))&lt;=@time)))
+AND (jsonb_array_length(CAST(@companies AS jsonb))=0 OR q.company_id IN (SELECT value FROM jsonb_array_elements_text(CAST(@companies AS jsonb))))
+AND (@projection=1 OR (
+  NOT EXISTS(SELECT 1 FROM jsonb_array_elements(r.payload_json::jsonb #&gt; '{sourceRefs}') s
+    WHERE (s.value::jsonb #&gt;&gt; '{materialId}')=@material AND (s.value::jsonb #&gt;&gt; '{versionId}')=@version)
+  AND (EXISTS(SELECT 1 FROM question_dependencies d WHERE d.effect_id=q.effect_id AND d.material_id=@material)
+    OR q.company_id IN (SELECT value FROM jsonb_array_elements_text(CAST(@companies AS jsonb))))))
+UNION ALL
+SELECT 'watch_' || a.analysis_id FROM analysis_receipts a
+WHERE 'watch_' || a.analysis_id&gt;@after AND jsonb_array_length(a.payload_json::jsonb #&gt; '{effects}')=0
+  AND insight_utc_ticks((a.payload_json::jsonb #&gt;&gt; '{asOf}'))&lt;=@time
+  AND (((@projection=1 OR @category='material:market') AND jsonb_array_length(CAST(@companies AS jsonb))=0) OR a.company_id IN (SELECT value FROM jsonb_array_elements_text(CAST(@companies AS jsonb))))
+  AND NOT ((a.payload_json::jsonb #&gt;&gt; '{trigger,materialId}') IS NOT DISTINCT FROM @material
+    AND (a.payload_json::jsonb #&gt;&gt; '{trigger,versionId}') IS NOT DISTINCT FROM @version)
+  AND NOT EXISTS(SELECT 1 FROM analysis_receipts n WHERE n.company_id=a.company_id
+    AND n.news_material_id=a.news_material_id
+    AND insight_utc_ticks((n.payload_json::jsonb #&gt;&gt; '{asOf}'))&lt;= @time
+    AND (insight_utc_ticks((n.payload_json::jsonb #&gt;&gt; '{asOf}'))&gt;insight_utc_ticks((a.payload_json::jsonb #&gt;&gt; '{asOf}'))
+      OR (insight_utc_ticks((n.payload_json::jsonb #&gt;&gt; '{asOf}'))=insight_utc_ticks((a.payload_json::jsonb #&gt;&gt; '{asOf}'))
+        AND (insight_utc_ticks((n.payload_json::jsonb #&gt;&gt; '{completedAt}'))&gt;insight_utc_ticks((a.payload_json::jsonb #&gt;&gt; '{completedAt}'))
+          OR ((n.payload_json::jsonb #&gt;&gt; '{completedAt}')=(a.payload_json::jsonb #&gt;&gt; '{completedAt}') AND n.analysis_id&gt;a.analysis_id)))))
+ORDER BY 1 LIMIT 65</value></data>
+<data name="ReadAnalysisWatch" xml:space="preserve"><value>SELECT payload_json FROM analysis_receipts WHERE analysis_id=@id</value></data>
+<data name="UpsertQuestionInvalidation" xml:space="preserve"><value>INSERT INTO question_invalidations VALUES(@id,@material,@version) ON CONFLICT(effect_id,material_id) DO UPDATE SET version_id=excluded.version_id</value></data>
+<data name="UpsertInvalidationTime" xml:space="preserve"><value>INSERT INTO question_invalidation_times VALUES(@id,@material,@known) ON CONFLICT(effect_id,material_id) DO UPDATE SET known_ticks=excluded.known_ticks</value></data>
+<data name="InsertInvalidationEvent" xml:space="preserve"><value>INSERT INTO question_validity_events(effect_id,material_id,kind,version_id,known_ticks) VALUES(@id,@material,'invalidated',@version,@known) ON CONFLICT DO NOTHING</value></data>
+<data name="InitializeEffects" xml:space="preserve"><value>CREATE TABLE IF NOT EXISTS effects (
+    effect_id TEXT PRIMARY KEY, company_id TEXT NOT NULL, bank_profile_id TEXT,
+    news_material_id TEXT NOT NULL, effect_key TEXT NOT NULL,
+    literal_object_ref TEXT NOT NULL, current_revision_id TEXT,
+    UNIQUE(company_id,news_material_id,effect_key)
+);
+CREATE TABLE IF NOT EXISTS effect_revisions (
+    revision_id TEXT PRIMARY KEY, effect_id TEXT NOT NULL,
+    previous_revision_id TEXT, news_version_id TEXT NOT NULL,
+    sequence BIGINT NOT NULL, payload_json TEXT NOT NULL,
+    UNIQUE(effect_id,news_version_id), UNIQUE(effect_id,sequence),
+    FOREIGN KEY(effect_id) REFERENCES effects(effect_id) DEFERRABLE INITIALLY IMMEDIATE,
+    FOREIGN KEY(previous_revision_id) REFERENCES effect_revisions(revision_id) DEFERRABLE INITIALLY IMMEDIATE
+);
+CREATE TABLE IF NOT EXISTS analysis_receipts (
+    analysis_id TEXT PRIMARY KEY, company_id TEXT NOT NULL,
+    news_material_id TEXT NOT NULL, news_version_id TEXT NOT NULL,
+    request_hash TEXT NOT NULL, payload_json TEXT NOT NULL,
+    UNIQUE(company_id,news_material_id,news_version_id)
+);
+CREATE TABLE IF NOT EXISTS questions (
+    effect_id TEXT PRIMARY KEY, company_id TEXT NOT NULL, bank_profile_id TEXT,
+    news_material_id TEXT NOT NULL, effect_key TEXT NOT NULL,
+    literal_object_ref TEXT NOT NULL, current_revision_id TEXT,
+    UNIQUE(company_id,effect_key)
+);
+CREATE TABLE IF NOT EXISTS question_revisions (
+    revision_id TEXT PRIMARY KEY, effect_id TEXT NOT NULL,
+    previous_revision_id TEXT, news_version_id TEXT NOT NULL,
+    sequence BIGINT NOT NULL, payload_json TEXT NOT NULL,
+    UNIQUE(effect_id,sequence),
+    FOREIGN KEY(effect_id) REFERENCES questions(effect_id) DEFERRABLE INITIALLY IMMEDIATE,
+    FOREIGN KEY(previous_revision_id) REFERENCES question_revisions(revision_id) DEFERRABLE INITIALLY IMMEDIATE
+);
+CREATE TABLE IF NOT EXISTS question_dependencies (
+    effect_id TEXT NOT NULL, material_id TEXT NOT NULL, version_id TEXT,
+    PRIMARY KEY(effect_id,material_id), FOREIGN KEY(effect_id) REFERENCES questions(effect_id) DEFERRABLE INITIALLY IMMEDIATE
+);
+CREATE INDEX IF NOT EXISTS ix_question_dependencies_material ON question_dependencies(material_id);
+CREATE TABLE IF NOT EXISTS question_invalidations (
+    effect_id TEXT NOT NULL, material_id TEXT NOT NULL, version_id TEXT NOT NULL,
+    PRIMARY KEY(effect_id,material_id), FOREIGN KEY(effect_id) REFERENCES questions(effect_id) DEFERRABLE INITIALLY IMMEDIATE);
+CREATE TABLE IF NOT EXISTS question_invalidation_times (
+    effect_id TEXT NOT NULL, material_id TEXT NOT NULL, known_ticks BIGINT NOT NULL,
+    PRIMARY KEY(effect_id,material_id));
+CREATE TABLE IF NOT EXISTS question_validity_events (
+    event_id BIGSERIAL PRIMARY KEY, effect_id TEXT NOT NULL, material_id TEXT NOT NULL,
+    kind TEXT NOT NULL, version_id TEXT NOT NULL, known_ticks BIGINT NOT NULL,
+    UNIQUE(effect_id,material_id,kind,version_id,known_ticks));
+CREATE INDEX IF NOT EXISTS ix_question_validity ON question_validity_events(effect_id,material_id,known_ticks,event_id);
+INSERT INTO question_validity_events(effect_id,material_id,kind,version_id,known_ticks)
+    SELECT i.effect_id,i.material_id,'invalidated',i.version_id,COALESCE(t.known_ticks,0)
+    FROM question_invalidations i LEFT JOIN question_invalidation_times t
+      ON t.effect_id=i.effect_id AND t.material_id=i.material_id ON CONFLICT DO NOTHING;</value></data>
+<data name="FindSnapshotEffects" xml:space="preserve"><value>SELECT effect_id FROM effects WHERE company_id=@company AND news_material_id=@material
+UNION ALL SELECT effect_id FROM questions WHERE company_id=@company ORDER BY effect_id</value></data>
+<data name="FindPreviousQuestion" xml:space="preserve"><value>SELECT effect_id FROM questions WHERE company_id=@company AND current_revision_id=@previous</value></data>
+<data name="RekeyQuestion" xml:space="preserve"><value>UPDATE questions SET effect_key=@key WHERE effect_id=@id</value></data>
+<data name="InsertQuestion" xml:space="preserve"><value>INSERT INTO questions(effect_id,company_id,bank_profile_id,news_material_id,effect_key,literal_object_ref)
+VALUES(@id,@company,@bank,@material,@key,@literal)</value></data>
+<data name="InsertEffect" xml:space="preserve"><value>INSERT INTO effects(effect_id,company_id,bank_profile_id,news_material_id,effect_key,literal_object_ref)
+VALUES(@id,@company,@bank,@material,@key,@literal)</value></data>
+<data name="InsertQuestionRevision" xml:space="preserve"><value>INSERT INTO question_revisions(revision_id,effect_id,previous_revision_id,news_version_id,sequence,payload_json)
+VALUES(@revision,@effect,@previous,@version,@sequence,@json)</value></data>
+<data name="InsertEffectRevision" xml:space="preserve"><value>INSERT INTO effect_revisions(revision_id,effect_id,previous_revision_id,news_version_id,sequence,payload_json)
+VALUES(@revision,@effect,@previous,@version,@sequence,@json)</value></data>
+<data name="AdvanceQuestionHead" xml:space="preserve"><value>UPDATE questions SET current_revision_id=@revision WHERE effect_id=@effect AND current_revision_id IS NOT DISTINCT FROM @previous</value></data>
+<data name="AdvanceEffectHead" xml:space="preserve"><value>UPDATE effects SET current_revision_id=@revision WHERE effect_id=@effect AND current_revision_id IS NOT DISTINCT FROM @previous</value></data>
+<data name="DeleteQuestionDependencies" xml:space="preserve"><value>DELETE FROM question_dependencies WHERE effect_id=@id</value></data>
+<data name="InsertQuestionDependency" xml:space="preserve"><value>INSERT INTO question_dependencies VALUES(@id,@material,@version)</value></data>
+<data name="ClearQuestionInvalidation" xml:space="preserve"><value>DELETE FROM question_invalidations WHERE effect_id=@id AND material_id=@material AND version_id=@version</value></data>
+<data name="InsertClearedValidityEvent" xml:space="preserve"><value>INSERT INTO question_validity_events(effect_id,material_id,kind,version_id,known_ticks) VALUES(@id,@material,'cleared',@version,@known) ON CONFLICT DO NOTHING</value></data>
+<data name="ClearInvalidationTime" xml:space="preserve"><value>DELETE FROM question_invalidation_times WHERE effect_id=@id AND material_id=@material AND NOT EXISTS (SELECT 1 FROM question_invalidations i WHERE i.effect_id=@id AND i.material_id=@material)</value></data>
+<data name="FindUnrevisedEffects" xml:space="preserve"><value>SELECT e.effect_id FROM effects e
+JOIN effect_revisions r ON r.revision_id=e.current_revision_id
+WHERE e.company_id=@company AND e.news_material_id=@material AND r.news_version_id&lt;&gt;@version
+UNION ALL SELECT q.effect_id FROM questions q JOIN question_revisions qr ON qr.revision_id=q.current_revision_id
+WHERE q.company_id=@company AND (CAST(@mechanisms AS text) IS NULL OR (qr.payload_json::jsonb #&gt;&gt; '{question,mechanism}') IN (SELECT value FROM jsonb_array_elements_text(CAST(@mechanisms AS jsonb))))
+ORDER BY effect_id</value></data>
+<data name="InsertAnalysisReceipt" xml:space="preserve"><value>INSERT INTO analysis_receipts(analysis_id,company_id,news_material_id,news_version_id,request_hash,payload_json)
+VALUES(@id,@company,@material,@version,@hash,@json)</value></data>
+<data name="ReadCompanyStateVersion" xml:space="preserve"><value>SELECT (SELECT COUNT(*) FROM effect_revisions r JOIN effects e ON e.effect_id=r.effect_id WHERE e.company_id=@company)
+  +(SELECT COUNT(*) FROM question_revisions r JOIN questions q ON q.effect_id=r.effect_id WHERE q.company_id=@company)</value></data>
+<data name="FindQuestionRecipients" xml:space="preserve"><value>SELECT DISTINCT q.company_id FROM questions q JOIN question_revisions r ON r.revision_id=q.current_revision_id
+WHERE q.company_id&gt;@after AND insight_utc_ticks((r.payload_json::jsonb #&gt;&gt; '{asOf}'))&lt;=@asOf
+AND (CAST(@material AS text) IS NULL OR EXISTS (SELECT 1 FROM question_dependencies d WHERE d.effect_id=q.effect_id AND d.material_id=@material))
+ORDER BY q.company_id LIMIT 257</value></data>
+<data name="FindAnalysisReceipt" xml:space="preserve"><value>SELECT request_hash AS "RequestHash",payload_json AS "PayloadJson" FROM analysis_receipts WHERE company_id=@company AND news_material_id=@material AND news_version_id=@version</value></data>
+<data name="TransactionLock" xml:space="preserve"><value>SELECT pg_advisory_xact_lock(714103201)</value></data>
+<data name="CreateUtcTicks" xml:space="preserve"><value>CREATE OR REPLACE FUNCTION insight_utc_ticks(value text) RETURNS bigint LANGUAGE sql IMMUTABLE STRICT AS $ticks$ SELECT (extract(epoch FROM regexp_replace(value, '\.[0-9]+', '')::timestamptz) * 10000000)::bigint + COALESCE(rpad(substring(value from '\.([0-9]+)'), 7, '0')::bigint, 0) + 621355968000000000 $ticks$;</value></data>
+</root>
