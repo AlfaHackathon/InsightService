@@ -14,7 +14,11 @@ public static class ServiceRegistration
         builder.WebHost.ConfigureKestrel(o => o.Limits.MaxRequestBodySize = 1024 * 1024);
         builder.Services.AddControllers(options => options.SuppressImplicitRequiredAttributeForNonNullableReferenceTypes = true)
             .ConfigureApiBehaviorOptions(options => options.InvalidModelStateResponseFactory = _ =>
-                new BadRequestObjectResult(new { code = "invalid_request", message = "The request body or parameters are invalid." }));
+                new BadRequestObjectResult(new
+                {
+                    code = "invalid_request",
+                    message = "The request body or parameters are invalid."
+                }));
         var database = DatabaseSettings.FromConfiguration(builder.Configuration);
         builder.Services.AddDapper(database).AddMigrations(database, typeof(Program).Assembly);
         builder.Services.AddScoped<IEffectRepository, EffectRepository>();

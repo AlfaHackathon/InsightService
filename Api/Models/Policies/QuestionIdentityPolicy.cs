@@ -1,11 +1,9 @@
-using InsightService.Common;
-using InsightService.Contracts.Analyses;
-using InsightService.Contracts.Questions;
-using InsightService.Models;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using InsightService.Contracts.Analyses;
+using InsightService.Contracts.Questions;
 using static InsightService.Common.AnalysisProtocol;
 namespace InsightService.Models.Policies;
 
@@ -13,7 +11,12 @@ internal static class QuestionIdentityPolicy
 {
     public static QuestionIdentity NormalizeQuestion(QuestionIdentity question) =>
         question.Frame == "event_only" && question.Unit == "qualitative"
-            ? question with { TargetPeriod = "unknown", BaselinePeriod = null, Basis = "qualitative" }
+            ? question with
+            {
+                TargetPeriod = "unknown",
+                BaselinePeriod = null,
+                Basis = "qualitative"
+            }
             : question;
 
     public static string QuestionKey(string literal, QuestionIdentity input)
@@ -30,7 +33,10 @@ internal static class QuestionIdentityPolicy
             || new[] { literal, question.Unit, question.TargetPeriod }.Any(s => string.IsNullOrWhiteSpace(s) || s.Length > 1000 || s.Any(char.IsControl))
             || question.BaselinePeriod is { } baseline && (string.IsNullOrWhiteSpace(baseline) || baseline.Length > 1000 || baseline.Any(char.IsControl))
             || question.Frame == "budget_delta" && question.BaselinePeriod is null)
+        {
             throw new ApiException(400, "invalid_question_identity", "A stable mechanism, frame, unit, target period and comparison baseline for budget deltas are required.");
+        }
+
         var key = string.Join('\u001f', literal, question.Mechanism, question.Frame, question.Unit, question.TargetPeriod, question.BaselinePeriod ?? "", question.Basis ?? "unknown");
         return "question-" + Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(key)))[..40];
     }

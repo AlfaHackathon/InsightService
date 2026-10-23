@@ -7,7 +7,11 @@ public sealed class DatabaseSettings : IDapperSettings
     public static DatabaseSettings FromConfiguration(IConfiguration configuration)
     {
         var connection = configuration.GetConnectionString("Postgres") ?? configuration["Storage:ConnectionString"];
-        if (string.IsNullOrWhiteSpace(connection)) throw new InvalidOperationException("ConnectionStrings:Postgres must configure the durable PostgreSQL database.");
+        if (string.IsNullOrWhiteSpace(connection))
+        {
+            throw new InvalidOperationException("ConnectionStrings:Postgres must configure the durable PostgreSQL database.");
+        }
+
         return new DatabaseSettings { ConnectionString = connection };
     }
 }

@@ -1,6 +1,3 @@
-
-using System.Text.Json.Serialization;
-
 namespace InsightService.Contracts.Analyses;
 
 public sealed record EffectResponse(string EffectId, string EffectKey, Guid CompanyId, string? BankProfileId,

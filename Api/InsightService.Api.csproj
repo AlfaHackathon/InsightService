@@ -4,10 +4,12 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="AlfaHackaton.Controllers" Version="1.4.0" />
-    <PackageReference Include="AlfaHackaton.DapperContext" Version="1.1.0" />
+    <PackageReference Include="AlfaHackaton.DapperContext" Version="1.2.0" />
     <PackageReference Include="AlfaHackaton.HttpClient" Version="1.1.1" />
     <!-- Override vulnerable transitive 8.0.x dependencies of the organization graph.
          NU1510 alone is suppressed on Xml: retaining this security pin is intentional. -->

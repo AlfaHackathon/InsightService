@@ -1,7 +1,6 @@
 using InsightService.Contracts.Calculations;
 using InsightService.Contracts.Context;
 using InsightService.Contracts.Questions;
-using System.Text.Json.Serialization;
 
 namespace InsightService.Contracts.Analyses;
 

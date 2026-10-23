@@ -17,7 +17,11 @@ public sealed class AnalysesController(IAnalysisService service) : BaseControlle
         [FromQuery, BindRequired] string newsMaterialId, [FromQuery, BindRequired] string newsVersionId,
         [FromQuery] string? triggerMaterialId, [FromQuery] string? triggerVersionId)
     {
-        if ((triggerMaterialId is null) != (triggerVersionId is null)) throw new ApiException(400, "invalid_trigger", "Both trigger identifiers are required.");
+        if ((triggerMaterialId is null) != (triggerVersionId is null))
+        {
+            throw new ApiException(400, "invalid_trigger", "Both trigger identifiers are required.");
+        }
+
         return OkOrProblem<AnalysisReceipt>(await service.GetAnalysis(companyId, newsMaterialId, newsVersionId,
             triggerMaterialId is null ? null : new(triggerMaterialId, triggerVersionId!)));
     }

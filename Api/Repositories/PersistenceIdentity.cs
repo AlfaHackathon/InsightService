@@ -1,7 +1,7 @@
-using InsightService.Common;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using InsightService.Common;
 namespace InsightService.Repositories;
 
 internal static class PersistenceIdentity

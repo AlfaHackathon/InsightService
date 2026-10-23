@@ -1,10 +1,9 @@
-using InsightService.Extensions;
-using InsightService.Models;
-using InsightService.Services.Interfaces;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
-using InsightService;
+using InsightService.Extensions;
+using InsightService.Models;
+using InsightService.Services.Interfaces;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -19,7 +18,8 @@ public sealed class ContextRedirectTests
         using var destinationDeadline = CancellationTokenSource.CreateLinkedTokenSource(deadline.Token);
         var origin = new TcpListener(IPAddress.Loopback, 0);
         var destination = new TcpListener(IPAddress.Loopback, 0);
-        origin.Start(); destination.Start();
+        origin.Start();
+        destination.Start();
         try
         {
             var originUrl = $"http://127.0.0.1:{((IPEndPoint)origin.LocalEndpoint).Port}";
@@ -37,7 +37,10 @@ public sealed class ContextRedirectTests
             using var provider = services.BuildServiceProvider();
             var resolver = provider.GetRequiredService<ISourceResolver>();
             ApiException? failure = null;
-            try { await resolver.Get("news", "v1", deadline.Token); }
+            try
+            {
+                await resolver.GetAsync("news", "v1", deadline.Token);
+            }
             catch (ApiException e) { failure = e; }
             var originSawSecret = await originObservation;
             destinationDeadline.CancelAfter(TimeSpan.FromSeconds(1));
@@ -80,7 +83,11 @@ public sealed class ContextRedirectTests
         while (!request.ToString().Contains("\r\n\r\n", StringComparison.Ordinal))
         {
             var count = await stream.ReadAsync(buffer, ct);
-            if (count == 0 || request.Length > 16384) throw new IOException("Incomplete bounded local test request.");
+            if (count == 0 || request.Length > 16384)
+            {
+                throw new IOException("Incomplete bounded local test request.");
+            }
+
             request.Append(Encoding.ASCII.GetString(buffer, 0, count));
         }
         var sawSecret = request.ToString().Split("\r\n").Any(line =>

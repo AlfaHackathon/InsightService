@@ -1,5 +1,4 @@
 using InsightService.Contracts.Context;
-using System.Text.Json.Serialization;
 
 namespace InsightService.Contracts.Analyses;
 

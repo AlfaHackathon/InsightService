@@ -1,11 +1,9 @@
 using InsightService.Contracts.Analyses;
-using InsightService.Contracts.Calculations;
 using InsightService.Contracts.Context;
 using InsightService.Models;
 using InsightService.Repositories;
 using InsightService.Services;
 using InsightService.Services.Interfaces;
-using InsightService;
 using Xunit;
 
 public sealed class ApplicabilityTests : IDisposable
@@ -32,7 +30,8 @@ public sealed class ApplicabilityTests : IDisposable
     [Fact]
     public async Task ProfileSignalStillCannotBePromotedByCallingItEstablished()
     {
-        var request = Request(); var draft = request.Drafts[0];
+        var request = Request();
+        var draft = request.Drafts[0];
         request = request with
         {
             Drafts = [draft with { Assessment = draft.Assessment! with
@@ -45,7 +44,8 @@ public sealed class ApplicabilityTests : IDisposable
     [Fact]
     public async Task DocumentedExposureWithExplicitScenarioIsSavedAsScenarioNotConfirmedConsequence()
     {
-        var request = Request(); var draft = request.Drafts[0];
+        var request = Request();
+        var draft = request.Drafts[0];
         request = request with
         {
             Drafts = [draft with { SourceRefs = [new("news", "1", Hash), new("contract", "1", Hash)],
@@ -61,8 +61,12 @@ public sealed class ApplicabilityTests : IDisposable
     [Fact]
     public async Task UnknownIsPersistedAsMissingDataAndNotAsZero()
     {
-        var request = Request(); var draft = request.Drafts[0];
-        request = request with { Drafts = [draft with { Status = "unknown", Impact = draft.Impact! with { EvidenceStatus = "unknown" } }] };
+        var request = Request();
+        var draft = request.Drafts[0];
+        request = request with
+        {
+            Drafts = [draft with { Status = "unknown", Impact = draft.Impact! with { EvidenceStatus = "unknown" } }]
+        };
         var saved = Assert.Single((await Service().Save(request)).Effects);
         Assert.Equal("missing_data", saved.CurrentRevision.PublicationClass);
         Assert.Null(saved.CurrentRevision.CalculationResult);
@@ -72,13 +76,16 @@ public sealed class ApplicabilityTests : IDisposable
     public async Task MissingImpactCannotBypassUnknownCalculationGuard()
     {
         var request = Request();
-        request = request with { Drafts = [request.Drafts[0] with { Impact = null, Question = new("financing_cost", "absolute", "RUB", "2026", null, "actual_cashflow"), Calculation = new(new("value", "0"), "RUB", "2026") }] };
+        request = request with
+        {
+            Drafts = [request.Drafts[0] with { Impact = null, Question = new("financing_cost", "absolute", "RUB", "2026", null, "actual_cashflow"), Calculation = new(new("value", "0"), "RUB", "2026") }]
+        };
         Assert.Equal("unknown_calculation", (await Assert.ThrowsAsync<ApiException>(async () => await Service().Save(request))).Code);
     }
 
     private sealed class Sources(Guid company) : ISourceResolver
     {
-        public Task<MaterialVersion> Get(string materialId, string versionId, CancellationToken ct) =>
+        public Task<MaterialVersion> GetAsync(string materialId, string versionId, CancellationToken ct) =>
             Task.FromResult(new MaterialVersion(materialId, versionId,
                 materialId == "profile" ? "provided-bank-csv" : "fixture", materialId == "news" ? "news" : "company",
                 materialId, "Synthetic source fixture", At, At, null, materialId == "news" ? [] : [company], [], Hash));

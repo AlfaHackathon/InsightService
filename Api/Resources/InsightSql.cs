@@ -49,7 +49,5 @@ internal static class InsightSql
     internal static string FindQuestionRecipients => Required(nameof(FindQuestionRecipients));
     internal static string FindAnalysisReceipt => Required(nameof(FindAnalysisReceipt));
     internal static string TransactionLock => Required(nameof(TransactionLock));
-    internal static string RowsEnvelope => Required(nameof(RowsEnvelope));
-    internal static string AffectedRowsEnvelope => Required(nameof(AffectedRowsEnvelope));
     internal static string CreateUtcTicks => Required(nameof(CreateUtcTicks));
 }

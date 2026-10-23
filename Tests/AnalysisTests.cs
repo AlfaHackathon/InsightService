@@ -1,3 +1,6 @@
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
 using InsightService.Contracts.Analyses;
 using InsightService.Contracts.Calculations;
 using InsightService.Contracts.Context;
@@ -6,10 +9,6 @@ using InsightService.Models.Persistence;
 using InsightService.Repositories;
 using InsightService.Services;
 using InsightService.Services.Interfaces;
-using InsightService;
-using System.Security.Cryptography;
-using System.Text;
-using System.Text.Json;
 using Xunit;
 
 public sealed class AnalysisTests : IDisposable
@@ -46,7 +45,10 @@ public sealed class AnalysisTests : IDisposable
     [Fact]
     public async Task EmptyDraftReceiptSurvivesRestartAndConflictingPayloadIsRejected()
     {
-        var empty = Request() with { Drafts = [] };
+        var empty = Request() with
+        {
+            Drafts = []
+        };
         var first = await Service().Save(empty);
         Assert.Empty(first.Effects);
         Assert.Equal(first.AnalysisId, (await Service().GetAnalysis(company, "news", "v1")).AnalysisId);
@@ -57,8 +59,15 @@ public sealed class AnalysisTests : IDisposable
     [Fact]
     public async Task OmittedPriorEffectsRemainExplicitInCorrectionReceiptAfterRestart()
     {
-        var original = await Service().Save(Request() with { ContextComplete = true });
-        var correction = Request("v2") with { Drafts = [], ContextComplete = false };
+        var original = await Service().Save(Request() with
+        {
+            ContextComplete = true
+        });
+        var correction = Request("v2") with
+        {
+            Drafts = [],
+            ContextComplete = false
+        };
         var saved = await Service().Save(correction);
         Assert.False(saved.ContextComplete);
         Assert.Equal([original.Effects.Single().EffectId], saved.UnrevisedEffectIds);
@@ -76,7 +85,10 @@ public sealed class AnalysisTests : IDisposable
     public async Task LegacyRequestWithoutContextCoverageStillReplaysItsExistingReceipt()
     {
         var request = Request();
-        request = request with { Drafts = [request.Drafts[0] with { SourceRefs = [new("contract", "v1", Hash), new("news", "v1", Hash)] }] };
+        request = request with
+        {
+            Drafts = [request.Drafts[0] with { SourceRefs = [new("contract", "v1", Hash), new("news", "v1", Hash)] }]
+        };
         // The wire/hash shape before optional coverage existed, independent of the current DTO.
         var legacy = new
         {
@@ -100,7 +112,10 @@ public sealed class AnalysisTests : IDisposable
     {
         var first = await Service().Save(Request());
         var prior = first.Effects.Single().RevisionId;
-        var wrongObject = Request("v2", prior) with { Drafts = [Request("v2", prior).Drafts[0] with { LiteralObjectRef = "another-object" }] };
+        var wrongObject = Request("v2", prior) with
+        {
+            Drafts = [Request("v2", prior).Drafts[0] with { LiteralObjectRef = "another-object" }]
+        };
         Assert.Equal(409, (await Assert.ThrowsAsync<ApiException>(async () => await Service().Save(wrongObject))).StatusCode);
         await Service().Save(Request("v2", prior, "60"));
         Assert.Equal(409, (await Assert.ThrowsAsync<ApiException>(async () => await Service().Save(Request("v3", prior, "40")))).StatusCode);
@@ -113,7 +128,10 @@ public sealed class AnalysisTests : IDisposable
         var request = Request();
         foreach (var source in new[] { new SourceRef("missing", "v1", Hash), new SourceRef("foreign", "v1", Hash), new SourceRef("future", "v1", Hash), new SourceRef("contract", "v1", new string('0', 64)) })
         {
-            var bad = request with { Drafts = [request.Drafts[0] with { SourceRefs = [new("news", "v1", Hash), source] }] };
+            var bad = request with
+            {
+                Drafts = [request.Drafts[0] with { SourceRefs = [new("news", "v1", Hash), source] }]
+            };
             Assert.Equal(422, (await Assert.ThrowsAsync<ApiException>(async () => await Service().Save(bad))).StatusCode);
             Assert.Empty((await Service().GetEffects(company, "news")));
         }
@@ -142,8 +160,13 @@ public sealed class AnalysisTests : IDisposable
         await paused.Entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
         AnalysisReceipt first;
         var winningRequest = conflictingPayload ? request with
-        { Drafts = [request.Drafts[0] with { Conclusion = "Different synthetic conclusion" }] } : request;
-        try { first = await Service().Save(winningRequest); }
+        {
+            Drafts = [request.Drafts[0] with { Conclusion = "Different synthetic conclusion" }]
+        } : request;
+        try
+        {
+            first = await Service().Save(winningRequest);
+        }
         finally { paused.Resume.TrySetResult(true); }
         if (conflictingPayload)
         {
@@ -164,7 +187,10 @@ public sealed class AnalysisTests : IDisposable
     public async Task RepositoryRollsBackWholeBatchWhenLaterEffectHasStalePrior()
     {
         var request = Request();
-        var invalid = request with { Drafts = [request.Drafts[0], request.Drafts[0] with { EffectKey = "lot-2", ExpectedPreviousRevisionId = "nonexistent" }] };
+        var invalid = request with
+        {
+            Drafts = [request.Drafts[0], request.Drafts[0] with { EffectKey = "lot-2", ExpectedPreviousRevisionId = "nonexistent" }]
+        };
         var prepared = invalid.Drafts.Select(x => new PreparedDraft(x, "15600")).ToArray();
         Assert.Equal(409, (await Assert.ThrowsAsync<ApiException>(async () => await Repository().Save(invalid, "request-hash", prepared))).StatusCode);
         Assert.Empty((await Repository().GetEffects(company, "news")));
@@ -179,7 +205,11 @@ public sealed class AnalysisTests : IDisposable
         Assert.Throws<ApiException>(() => DecimalCalculator.Calculate(new(new("divide", Left: Value("1"), Right: Value("0")), "RUB", "test")));
         Assert.Throws<ApiException>(() => DecimalCalculator.Calculate(new(new("multiply", Left: Value(decimal.MaxValue.ToString()), Right: Value("2")), "RUB", "test")));
         ExpressionNode deep = Value("1");
-        for (var i = 0; i < 17; i++) deep = new("add", Left: deep, Right: Value("1"));
+        for (var i = 0; i < 17; i++)
+        {
+            deep = new("add", Left: deep, Right: Value("1"));
+        }
+
         Assert.Throws<ApiException>(() => DecimalCalculator.Calculate(new(deep, "RUB", "test")));
     }
 
@@ -187,9 +217,13 @@ public sealed class AnalysisTests : IDisposable
 
     private sealed class Sources(Guid company, DateTimeOffset now) : ISourceResolver
     {
-        public Task<MaterialVersion> Get(string materialId, string versionId, CancellationToken cancellationToken)
+        public Task<MaterialVersion> GetAsync(string materialId, string versionId, CancellationToken cancellationToken)
         {
-            if (materialId == "missing") throw new ApiException(422, "unknown_source", "missing");
+            if (materialId == "missing")
+            {
+                throw new ApiException(422, "unknown_source", "missing");
+            }
+
             var material = new MaterialVersion(materialId, versionId, "source", materialId == "news" ? "news" : "company",
                 "Synthetic", "Synthetic source", materialId == "future" ? now.AddDays(1) : now,
                 now, materialId == "news" && versionId != "v1" ? versionId == "v2" ? "v1" : "v2" : null,
@@ -204,14 +238,14 @@ public sealed class AnalysisTests : IDisposable
         public TaskCompletionSource<bool> Resume { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private int paused;
 
-        public async Task<MaterialVersion> Get(string materialId, string versionId, CancellationToken cancellationToken)
+        public async Task<MaterialVersion> GetAsync(string materialId, string versionId, CancellationToken cancellationToken)
         {
             if (Interlocked.Exchange(ref paused, 1) == 0)
             {
                 Entered.TrySetResult(true);
                 await Resume.Task.WaitAsync(TimeSpan.FromSeconds(5), cancellationToken);
             }
-            return await inner.Get(materialId, versionId, cancellationToken);
+            return await inner.GetAsync(materialId, versionId, cancellationToken);
         }
     }
 }

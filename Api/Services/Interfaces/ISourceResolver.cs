@@ -3,5 +3,5 @@ namespace InsightService.Services.Interfaces;
 
 public interface ISourceResolver
 {
-    Task<MaterialVersion> Get(string materialId, string versionId, CancellationToken cancellationToken);
+    Task<MaterialVersion> GetAsync(string materialId, string versionId, CancellationToken cancellationToken);
 }

@@ -6,7 +6,6 @@ using InsightService.Models;
 using InsightService.Repositories;
 using InsightService.Services;
 using InsightService.Services.Interfaces;
-using InsightService;
 using Xunit;
 
 public sealed class QuestionHistoryTests : IDisposable
@@ -25,7 +24,10 @@ public sealed class QuestionHistoryTests : IDisposable
     public async Task RestrictedNewVersionCannotInvalidateAnotherCompanyThroughOldDependency()
     {
         var original = Request("news-a", "v1");
-        original = original with { Drafts = [original.Drafts[0] with { SourceRefs = [new("news-a", "v1", Hash), new("market", "v1", Hash)] }] };
+        original = original with
+        {
+            Drafts = [original.Drafts[0] with { SourceRefs = [new("news-a", "v1", Hash), new("market", "v1", Hash)] }]
+        };
         var first = (await Service().Save(original)).Effects.Single();
         Assert.Empty((await Service().React(new("material:market", "market", "v2", at.AddHours(2), [Guid.NewGuid()]))).Items);
         Assert.False((await Service().GetEffect(first.EffectId)).RequiresReassessment);
@@ -36,10 +38,17 @@ public sealed class QuestionHistoryTests : IDisposable
     [Fact]
     public async Task EmptyAssessmentIsWatchedWhenFirstCompanyDocumentArrivesWithoutInventingQuestion()
     {
-        var receipt = await Service().Save(Request("news-a", "v1") with { Drafts = [], ContextComplete = false });
+        var receipt = await Service().Save(Request("news-a", "v1") with
+        {
+            Drafts = [],
+            ContextComplete = false
+        });
         var page = (await Service().React(new("material:company", "first-own-document", "v1", at.AddHours(2), [company])));
-        var work = Assert.Single(page.Items); Assert.Null(work.EffectId); Assert.Equal("analysis_watch", work.Kind);
-        Assert.Equal(receipt.AnalysisId, work.AnalysisId); Assert.Equal("news-a", work.NewsMaterialId);
+        var work = Assert.Single(page.Items);
+        Assert.Null(work.EffectId);
+        Assert.Equal("analysis_watch", work.Kind);
+        Assert.Equal(receipt.AnalysisId, work.AnalysisId);
+        Assert.Equal("news-a", work.NewsMaterialId);
         Assert.Empty((await Service().GetEffects(company, "news-a")));
         Assert.Empty((await Service().React(new("material:company", "foreign", "v1", at.AddHours(2), [Guid.NewGuid()]))).Items);
         Assert.Empty((await Service().React(new("material:market", "foreign-market", "v1", at.AddHours(2), [Guid.NewGuid()]))).Items);
@@ -57,7 +66,8 @@ public sealed class QuestionHistoryTests : IDisposable
             command.ExecuteNonQuery();
         }
         var next = await Service().Save(Request("news-b", "v1", mechanism: "rent_indexation"));
-        Assert.Single(next.Effects); Assert.Equal(2, (await Service().GetEffects(company, "news-b")).Count);
+        Assert.Single(next.Effects);
+        Assert.Equal(2, (await Service().GetEffects(company, "news-b")).Count);
         Assert.Equal("September 2026", (await Service().GetEffect(first.EffectId)).CurrentRevision.Question!.TargetPeriod);
     }
 
@@ -65,20 +75,31 @@ public sealed class QuestionHistoryTests : IDisposable
     public async Task LegacyDatedQuestionRekeysWithoutLosingHistoryOrReplay()
     {
         var q = new QuestionIdentity("financing_cost", "event_only", "qualitative", "2026-09-11", null, "qualitative");
-        var request = Request("news-a", "v1") with { Drafts = [Request("news-a", "v1").Drafts[0] with { Question = q }] };
+        var request = Request("news-a", "v1") with
+        {
+            Drafts = [Request("news-a", "v1").Drafts[0] with { Question = q }]
+        };
         var first = (await Service().Save(request)).Effects.Single();
         var keyText = string.Join('\u001f', request.Drafts[0].LiteralObjectRef, q.Mechanism, q.Frame, q.Unit, q.TargetPeriod, "", q.Basis);
         var oldKey = "question-" + Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(keyText)))[..40];
-        var oldRequest = request with { Drafts = [request.Drafts[0] with { EffectKey = oldKey }] };
+        var oldRequest = request with
+        {
+            Drafts = [request.Drafts[0] with { EffectKey = oldKey }]
+        };
         var oldHash = Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(System.Text.Json.JsonSerializer.Serialize(oldRequest, AnalysisService.Json))));
         using (var db = database.Open())
         {
             using var command = db.CreateCommand();
             command.CommandText = "UPDATE questions SET effect_key=@key; UPDATE question_revisions SET payload_json=jsonb_set(payload_json::jsonb,'{question,targetPeriod}','\"2026-09-11\"')::text; UPDATE analysis_receipts SET request_hash=@hash";
-            command.Parameters.AddWithValue("@key", oldKey); command.Parameters.AddWithValue("@hash", oldHash); command.ExecuteNonQuery();
+            command.Parameters.AddWithValue("@key", oldKey);
+            command.Parameters.AddWithValue("@hash", oldHash);
+            command.ExecuteNonQuery();
         }
         Assert.True((await Service().Save(request)).Duplicate);
-        var next = Request("news-b", "v1", first.RevisionId) with { Drafts = [Request("news-b", "v1", first.RevisionId).Drafts[0] with { Question = q with { TargetPeriod = "2026-10-23" } }] };
+        var next = Request("news-b", "v1", first.RevisionId) with
+        {
+            Drafts = [Request("news-b", "v1", first.RevisionId).Drafts[0] with { Question = q with { TargetPeriod = "2026-10-23" } }]
+        };
         var second = (await Service().Save(next)).Effects.Single();
         Assert.Equal(first.EffectId, second.EffectId);
         Assert.Equal(2, (await Service().GetEffect(first.EffectId)).History.Count);
@@ -131,15 +152,25 @@ public sealed class QuestionHistoryTests : IDisposable
     public async Task NewDocumentVersionInvalidatesAndReassessesSameQuestionWithSeparateReceipt()
     {
         var original = Request("news-a", "v1");
-        original = original with { Drafts = [original.Drafts[0] with { SourceRefs = [new("news-a", "v1", Hash), new("contract", "v1", Hash)] }] };
+        original = original with
+        {
+            Drafts = [original.Drafts[0] with { SourceRefs = [new("news-a", "v1", Hash), new("contract", "v1", Hash)] }]
+        };
         var first = (await Service().Save(original)).Effects.Single();
         var affected = (await Service().React(new("material:company", "contract", "v2", at.AddHours(2), [company])));
         Assert.Equal(first.EffectId, affected.Items.Single().EffectId);
         Assert.True((await Service().GetEffect(first.EffectId)).RequiresReassessment);
         Assert.False((await Service().GetSnapshot(company, "news-a", at.AddHours(1))).Effects.Single().RequiresReassessment);
         Assert.Equal([company], (await Service().Recipients(at.AddHours(2), null, "contract")).CompanyIds);
-        var revisionRequest = Request("news-a", "v1", first.RevisionId) with { AsOf = at.AddHours(2), Trigger = new("contract", "v2") };
-        revisionRequest = revisionRequest with { Drafts = [revisionRequest.Drafts[0] with { SourceRefs = [new("news-a", "v1", Hash), new("contract", "v1", Hash), new("contract", "v2", Hash)] }] };
+        var revisionRequest = Request("news-a", "v1", first.RevisionId) with
+        {
+            AsOf = at.AddHours(2),
+            Trigger = new("contract", "v2")
+        };
+        revisionRequest = revisionRequest with
+        {
+            Drafts = [revisionRequest.Drafts[0] with { SourceRefs = [new("news-a", "v1", Hash), new("contract", "v1", Hash), new("contract", "v2", Hash)] }]
+        };
         var updated = await Service().Save(revisionRequest);
         Assert.NotEqual((await Service().Save(original)).AnalysisId, updated.AnalysisId);
         Assert.Equal(first.EffectId, updated.Effects.Single().EffectId);
@@ -159,8 +190,15 @@ public sealed class QuestionHistoryTests : IDisposable
         await Service().React(new("material:company", "contract", "v2", at.AddHours(2), [company]));
         await Service().React(new("material:company", "contract", "v3", at.AddHours(3), [company]));
         Assert.True((await Service().GetSnapshot(company, "news-a", at.AddHours(2.5))).Effects.Single().RequiresReassessment);
-        var request = Request("news-a", "v1", first.RevisionId) with { AsOf = at.AddHours(4), Trigger = new("contract", "v3") };
-        request = request with { Drafts = [request.Drafts[0] with { SourceRefs = [new("news-a", "v1", Hash), new("contract", "v3", Hash)] }] };
+        var request = Request("news-a", "v1", first.RevisionId) with
+        {
+            AsOf = at.AddHours(4),
+            Trigger = new("contract", "v3")
+        };
+        request = request with
+        {
+            Drafts = [request.Drafts[0] with { SourceRefs = [new("news-a", "v1", Hash), new("contract", "v3", Hash)] }]
+        };
         await Service().Save(request);
         Assert.False((await Service().GetEffect(first.EffectId)).RequiresReassessment);
         Assert.True((await Service().GetSnapshot(company, "news-a", at.AddHours(2.5))).Effects.Single().RequiresReassessment);
@@ -171,15 +209,22 @@ public sealed class QuestionHistoryTests : IDisposable
     public async Task HistoricalMembershipChangeRoutesUsingAvailablePriorQuestionRevision()
     {
         var first = (await Service().Save(Request("news-a", "v1"))).Effects.Single();
-        await Service().Save(Request("news-b", "v1", first.RevisionId) with { AsOf = at.AddHours(3) });
+        await Service().Save(Request("news-b", "v1", first.RevisionId) with
+        {
+            AsOf = at.AddHours(3)
+        });
         var work = Assert.Single((await Service().React(new("group", "root", "2", at.AddHours(2), []))).Items);
-        Assert.Equal("news-a", work.NewsMaterialId); Assert.Equal("v1", work.NewsVersionId);
+        Assert.Equal("news-a", work.NewsMaterialId);
+        Assert.Equal("v1", work.NewsVersionId);
     }
 
     [Fact]
     public async Task SourceReactionAndRecipientsPreserveOneHundredNanosecondBoundary()
     {
-        var saved = (await Service().Save(Request("news-a", "v1") with { AsOf = at.AddTicks(1) })).Effects.Single();
+        var saved = (await Service().Save(Request("news-a", "v1") with
+        {
+            AsOf = at.AddTicks(1)
+        })).Effects.Single();
         Assert.Empty((await Service().React(new("material:company", "later-document", "1", at, [company]))).Items);
         Assert.Empty((await Service().Recipients(at, null, null)).CompanyIds);
         Assert.Equal([company], (await Service().Recipients(at.AddTicks(1), null, null)).CompanyIds);
@@ -190,9 +235,13 @@ public sealed class QuestionHistoryTests : IDisposable
     public async Task UnrelatedMechanismScopeDoesNotInvalidateAnUnchangedFinancingQuestion()
     {
         var finance = (await Service().Save(Request("news-a", "v1"))).Effects.Single();
-        var rent = Request("news-b", "v1", mechanism: "rent_indexation") with { Mechanisms = ["rent_indexation"] };
+        var rent = Request("news-b", "v1", mechanism: "rent_indexation") with
+        {
+            Mechanisms = ["rent_indexation"]
+        };
         var saved = await Service().Save(rent);
-        Assert.Empty(saved.UnrevisedEffectIds!); Assert.Single((await Service().GetEffect(finance.EffectId)).History);
+        Assert.Empty(saved.UnrevisedEffectIds!);
+        Assert.Single((await Service().GetEffect(finance.EffectId)).History);
     }
 
     [Fact]
@@ -204,14 +253,23 @@ public sealed class QuestionHistoryTests : IDisposable
         {
             Conclusion = "Synthetic wrong model text: 800 RUB",
             Calculation = calculation,
-            Question = request.Drafts[0].Question! with { TargetPeriod = "2026-11", Basis = "monthly_run_rate" },
+            Question = request.Drafts[0].Question! with
+            {
+                TargetPeriod = "2026-11",
+                Basis = "monthly_run_rate"
+            },
             SourceRefs = [new("news-a", "v1", Hash), new("contract", "v1", Hash)],
             Impact = new("expense_delta", "monthly_run_rate", null, "supported", 1, 1, 1),
             Assessment = new([], [], new("established", "documented_exposure", "Synthetic own exposure", [new("contract", "v1", Hash)], []))
         };
-        var saved = (await Service().Save(request with { Drafts = [draft] })).Effects.Single().CurrentRevision;
-        Assert.Equal("8000", saved.CalculationResult); Assert.Contains("8000 RUB", saved.Conclusion);
-        Assert.DoesNotContain("800 RUB", saved.Conclusion); Assert.Equal(draft.Conclusion, saved.ModelExplanation);
+        var saved = (await Service().Save(request with
+        {
+            Drafts = [draft]
+        })).Effects.Single().CurrentRevision;
+        Assert.Equal("8000", saved.CalculationResult);
+        Assert.Contains("8000 RUB", saved.Conclusion);
+        Assert.DoesNotContain("800 RUB", saved.Conclusion);
+        Assert.Equal(draft.Conclusion, saved.ModelExplanation);
     }
 
     [Fact]
@@ -219,21 +277,44 @@ public sealed class QuestionHistoryTests : IDisposable
     {
         var request = Request("news-a", "v1");
         var absolute = request.Drafts[0];
-        var eventOnly = absolute with { Question = absolute.Question! with { Frame = "event_only" } };
-        var delta = absolute with { Question = absolute.Question! with { Frame = "budget_delta", BaselinePeriod = "budget:2026-11" } };
-        var receipt = await Service().Save(request with { Drafts = [absolute, eventOnly, delta] });
+        var eventOnly = absolute with
+        {
+            Question = absolute.Question! with
+            {
+                Frame = "event_only"
+            }
+        };
+        var delta = absolute with
+        {
+            Question = absolute.Question! with
+            {
+                Frame = "budget_delta",
+                BaselinePeriod = "budget:2026-11"
+            }
+        };
+        var receipt = await Service().Save(request with
+        {
+            Drafts = [absolute, eventOnly, delta]
+        });
         Assert.Equal(3, receipt.Effects.Select(e => e.EffectId).Distinct().Count());
         var invalid = Request("news-b", "v1", mechanism: "rent_indexation");
-        invalid = invalid with { Drafts = [invalid.Drafts[0] with { Question = invalid.Drafts[0].Question! with { Frame = "budget_delta", BaselinePeriod = "2026-11 budget 14000 RUB" } }] };
+        invalid = invalid with
+        {
+            Drafts = [invalid.Drafts[0] with { Question = invalid.Drafts[0].Question! with { Frame = "budget_delta", BaselinePeriod = "2026-11 budget 14000 RUB" } }]
+        };
         Assert.Equal("invalid_question_identity", (await Assert.ThrowsAsync<ApiException>(async () => await Service().Save(invalid))).Code);
     }
 
     [Fact]
     public async Task ConcurrentQuestionCreationInvalidatesWholeBeforeSnapshot()
     {
-        var snapshot = (await Service().GetSnapshot(company, "news-a")); Assert.Equal(0, snapshot.StateVersion);
+        var snapshot = (await Service().GetSnapshot(company, "news-a"));
+        Assert.Equal(0, snapshot.StateVersion);
         await Service().Save(Request("news-a", "v1"));
-        var stale = Request("news-b", "v1", mechanism: "rent_indexation") with { ExpectedStateVersion = snapshot.StateVersion };
+        var stale = Request("news-b", "v1", mechanism: "rent_indexation") with
+        {
+            ExpectedStateVersion = snapshot.StateVersion
+        };
         var error = await Assert.ThrowsAsync<ApiException>(async () => await Service().Save(stale));
         Assert.Equal("stale_company_snapshot", error.Code);
         Assert.Single((await Service().GetSnapshot(company, "news-b")).Effects);
@@ -245,10 +326,17 @@ public sealed class QuestionHistoryTests : IDisposable
     {
         var first = Request("news-a", "v1");
         var rent = Request("news-a", "v1", mechanism: "rent_indexation").Drafts.Single();
-        var request = first with { Drafts = [first.Drafts.Single(), rent] };
+        var request = first with
+        {
+            Drafts = [first.Drafts.Single(), rent]
+        };
         var saved = await Service().Save(request);
-        var replay = await Service().Save(request with { Drafts = request.Drafts.Reverse().ToArray() });
-        Assert.True(replay.Duplicate); Assert.Equal(saved.AnalysisId, replay.AnalysisId);
+        var replay = await Service().Save(request with
+        {
+            Drafts = request.Drafts.Reverse().ToArray()
+        });
+        Assert.True(replay.Duplicate);
+        Assert.Equal(saved.AnalysisId, replay.AnalysisId);
         Assert.All((await Service().GetEffects(company, "news-a")), q => Assert.Single(q.History));
     }
 
@@ -257,14 +345,17 @@ public sealed class QuestionHistoryTests : IDisposable
     {
         var finance = Request("news-a", "v1");
         var rent = Request("news-a", "v1", mechanism: "rent_indexation").Drafts.Single();
-        var receipt = await Service().Save(finance with { Drafts = [finance.Drafts.Single(), rent] });
+        var receipt = await Service().Save(finance with
+        {
+            Drafts = [finance.Drafts.Single(), rent]
+        });
         Assert.Equal(2, receipt.Effects.Select(e => e.EffectId).Distinct().Count());
         Assert.Equal(2, (await Service().GetEffects(company, "news-b")).Count);
     }
 
     private sealed class Sources(DateTimeOffset at, Guid company) : ISourceResolver
     {
-        public Task<MaterialVersion> Get(string materialId, string versionId, CancellationToken ct) =>
+        public Task<MaterialVersion> GetAsync(string materialId, string versionId, CancellationToken ct) =>
             Task.FromResult(new MaterialVersion(materialId, versionId, "synthetic", materialId.StartsWith("news") ? "news" : "company", "Fixture", "Synthetic original",
                 at, at, versionId == "v2" ? "v1" : null, materialId.StartsWith("news") ? [] : [company], [], Hash));
     }

@@ -1,6 +1,3 @@
-
-using System.Text.Json.Serialization;
-
 namespace InsightService.Contracts.Analyses;
 
 public sealed record AnalysisReceipt(string AnalysisId, Guid CompanyId, string? BankProfileId,

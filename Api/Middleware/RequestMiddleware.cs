@@ -1,15 +1,15 @@
-using InsightService.Models;
 using System.Security.Cryptography;
 using System.Text;
-using System.Text.Json;
-using InsightService;
-using Microsoft.AspNetCore.Routing;
+using InsightService.Models;
 using Npgsql;
 
 namespace InsightService.Middleware;
 
-public static class RequestMiddleware
+public static partial class RequestMiddleware
 {
+    [LoggerMessage(Level = LogLevel.Error, Message = "Insight request failed")]
+    private static partial void LogRequestFailed(ILogger logger, Exception exception);
+
     public static void UseInsightRequestHandling(this WebApplication app)
     {
         app.Use(async (context, next) =>
@@ -25,7 +25,11 @@ public static class RequestMiddleware
                             SHA256.HashData(Encoding.UTF8.GetBytes(supplied))))
                     {
                         context.Response.StatusCode = 403;
-                        await context.Response.WriteAsJsonAsync(new { code = "internal_access_denied", message = "A configured internal credential is required." });
+                        await context.Response.WriteAsJsonAsync(new
+                        {
+                            code = "internal_access_denied",
+                            message = "A configured internal credential is required."
+                        });
                         return;
                     }
                 }
@@ -34,23 +38,39 @@ public static class RequestMiddleware
             catch (ApiException e)
             {
                 context.Response.StatusCode = e.StatusCode;
-                await context.Response.WriteAsJsonAsync(new { code = e.Code, message = e.Message });
+                await context.Response.WriteAsJsonAsync(new
+                {
+                    code = e.Code,
+                    message = e.Message
+                });
             }
             catch (BadHttpRequestException)
             {
                 context.Response.StatusCode = 400;
-                await context.Response.WriteAsJsonAsync(new { code = "invalid_request", message = "The request body or parameters are invalid." });
+                await context.Response.WriteAsJsonAsync(new
+                {
+                    code = "invalid_request",
+                    message = "The request body or parameters are invalid."
+                });
             }
             catch (PostgresException e) when (e.SqlState is "55P03" or "40P01" or "40001" or "57014")
             {
                 context.Response.StatusCode = 503;
-                await context.Response.WriteAsJsonAsync(new { code = "storage_busy", message = "Local storage is busy; no successful result is implied." });
+                await context.Response.WriteAsJsonAsync(new
+                {
+                    code = "storage_busy",
+                    message = "Local storage is busy; no successful result is implied."
+                });
             }
             catch (Exception e)
             {
-                app.Logger.LogError(e, "Insight request failed");
+                LogRequestFailed(app.Logger, e);
                 context.Response.StatusCode = 500;
-                await context.Response.WriteAsJsonAsync(new { code = "internal_error", message = "The request failed; no successful result is implied." });
+                await context.Response.WriteAsJsonAsync(new
+                {
+                    code = "internal_error",
+                    message = "The request failed; no successful result is implied."
+                });
             }
         });
     }

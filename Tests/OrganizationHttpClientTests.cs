@@ -1,12 +1,12 @@
+using System.Net;
+using System.Text;
+using System.Text.Json;
 using AlfaHackaton.HttpClient.Http;
 using InsightService.Contracts.Context;
 using InsightService.Models;
 using InsightService.Services;
 using InsightService.Settings;
 using Microsoft.Extensions.Configuration;
-using System.Net;
-using System.Text;
-using System.Text.Json;
 using Xunit;
 
 public sealed class OrganizationHttpClientTests
@@ -29,13 +29,19 @@ public sealed class OrganizationHttpClientTests
             Assert.Null(request.Headers.Authorization);
             Assert.False(request.Headers.Contains("X-User-Id"));
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
-            { Content = new StringContent(JsonSerializer.Serialize(material), Encoding.UTF8, "application/json") });
+            {
+                Content = new StringContent(JsonSerializer.Serialize(material), Encoding.UTF8, "application/json")
+            });
         }));
         var settings = new ContextHttpSettings();
         var client = new HttpClient<ContextHttpSettings>(transport, settings);
         var resolver = new ContextSourceResolver(client, Configuration());
-        var resolved = await resolver.Get("news", "v1", CancellationToken.None);
-        Assert.Equal(material, resolved with { CompanyIds = material.CompanyIds, BankProfileIds = material.BankProfileIds });
+        var resolved = await resolver.GetAsync("news", "v1", CancellationToken.None);
+        Assert.Equal(material, resolved with
+        {
+            CompanyIds = material.CompanyIds,
+            BankProfileIds = material.BankProfileIds
+        });
         Assert.Equal(at.UtcTicks, resolved.KnownAt.UtcTicks);
         Assert.False(settings.AutoRedirect);
         Assert.Equal(TimeSpan.FromSeconds(15), settings.Timeout);
@@ -49,9 +55,11 @@ public sealed class OrganizationHttpClientTests
     public async Task OrganizationClientPreservesUpstreamStatusMapping(int status, int expected, string code)
     {
         using var transport = new System.Net.Http.HttpClient(new Handler((_, _) => Task.FromResult(new HttpResponseMessage((HttpStatusCode)status)
-        { Content = new StringContent("{\"upstream\":\"failure\"}") })));
+        {
+            Content = new StringContent("{\"upstream\":\"failure\"}")
+        })));
         var resolver = new ContextSourceResolver(new HttpClient<ContextHttpSettings>(transport, new()), Configuration());
-        var error = await Assert.ThrowsAsync<ApiException>(() => resolver.Get("news", "v1", CancellationToken.None));
+        var error = await Assert.ThrowsAsync<ApiException>(() => resolver.GetAsync("news", "v1", CancellationToken.None));
         Assert.Equal(expected, error.StatusCode);
         Assert.Equal(code, error.Code);
     }
@@ -64,13 +72,17 @@ public sealed class OrganizationHttpClientTests
             await Task.Delay(Timeout.Infinite, ct);
             return new HttpResponseMessage(HttpStatusCode.OK);
         }))
-        { Timeout = TimeSpan.FromMilliseconds(30) };
+        {
+            Timeout = TimeSpan.FromMilliseconds(30)
+        };
         var resolver = new ContextSourceResolver(new HttpClient<ContextHttpSettings>(slow, new()), Configuration());
-        Assert.Equal("context_timeout", (await Assert.ThrowsAsync<ApiException>(() => resolver.Get("news", "v1", CancellationToken.None))).Code);
+        Assert.Equal("context_timeout", (await Assert.ThrowsAsync<ApiException>(() => resolver.GetAsync("news", "v1", CancellationToken.None))).Code);
         using var invalid = new System.Net.Http.HttpClient(new Handler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
-        { Content = new StringContent("{") })));
+        {
+            Content = new StringContent("{")
+        })));
         resolver = new(new HttpClient<ContextHttpSettings>(invalid, new()), Configuration());
-        Assert.Equal("invalid_context_response", (await Assert.ThrowsAsync<ApiException>(() => resolver.Get("news", "v1", CancellationToken.None))).Code);
+        Assert.Equal("invalid_context_response", (await Assert.ThrowsAsync<ApiException>(() => resolver.GetAsync("news", "v1", CancellationToken.None))).Code);
     }
 
     private sealed class Handler(Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> send) : HttpMessageHandler

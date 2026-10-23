@@ -2,8 +2,8 @@
 <root>
 <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
 <resheader name="version"><value>2.0</value></resheader>
-<data name="ReadQuestionHead" xml:space="preserve"><value>SELECT effect_key,company_id,bank_profile_id,news_material_id,literal_object_ref,current_revision_id FROM questions WHERE effect_id=@id</value></data>
-<data name="ReadEffectHead" xml:space="preserve"><value>SELECT effect_key,company_id,bank_profile_id,news_material_id,literal_object_ref,current_revision_id FROM effects WHERE effect_id=@id</value></data>
+<data name="ReadQuestionHead" xml:space="preserve"><value>SELECT effect_key AS "EffectKey",company_id::uuid AS "CompanyId",bank_profile_id AS "BankProfileId",news_material_id AS "NewsMaterialId",literal_object_ref AS "LiteralObjectRef",current_revision_id AS "CurrentRevisionId" FROM questions WHERE effect_id=@id</value></data>
+<data name="ReadEffectHead" xml:space="preserve"><value>SELECT effect_key AS "EffectKey",company_id::uuid AS "CompanyId",bank_profile_id AS "BankProfileId",news_material_id AS "NewsMaterialId",literal_object_ref AS "LiteralObjectRef",current_revision_id AS "CurrentRevisionId" FROM effects WHERE effect_id=@id</value></data>
 <data name="ReadQuestionHistory" xml:space="preserve"><value>SELECT payload_json FROM question_revisions WHERE effect_id=@id ORDER BY sequence</value></data>
 <data name="ReadEffectHistory" xml:space="preserve"><value>SELECT payload_json FROM effect_revisions WHERE effect_id=@id ORDER BY sequence</value></data>
 <data name="HasPendingInvalidation" xml:space="preserve"><value>SELECT EXISTS(SELECT 1 FROM question_validity_events e WHERE e.effect_id=@id AND e.known_ticks&lt;=@asof AND e.kind='invalidated'
@@ -17,7 +17,7 @@ CREATE INDEX IF NOT EXISTS ix_news_jobs_queue ON news_jobs(status,lease_ticks,up
 CREATE TABLE IF NOT EXISTS news_job_events (job_id TEXT NOT NULL, version BIGINT NOT NULL,
     payload TEXT NOT NULL, PRIMARY KEY(job_id,version));
 CREATE TABLE IF NOT EXISTS source_cursor (id BIGINT PRIMARY KEY CHECK(id=1), version BIGINT NOT NULL, payload TEXT NOT NULL);</value></data>
-<data name="FindJobRequest" xml:space="preserve"><value>SELECT request_hash,payload FROM news_jobs WHERE job_id=@id</value></data>
+<data name="FindJobRequest" xml:space="preserve"><value>SELECT request_hash AS "RequestHash",payload AS "Payload" FROM news_jobs WHERE job_id=@id</value></data>
 <data name="ReadSourceCursor" xml:space="preserve"><value>SELECT payload FROM source_cursor WHERE id=1</value></data>
 <data name="ReadSourceCursorVersion" xml:space="preserve"><value>SELECT version FROM source_cursor WHERE id=1</value></data>
 <data name="UpsertSourceCursor" xml:space="preserve"><value>INSERT INTO source_cursor VALUES(1,@v,@p) ON CONFLICT(id) DO UPDATE SET version=excluded.version,payload=excluded.payload</value></data>
@@ -142,9 +142,7 @@ VALUES(@id,@company,@material,@version,@hash,@json)</value></data>
 WHERE q.company_id&gt;@after AND insight_utc_ticks((r.payload_json::jsonb #&gt;&gt; '{asOf}'))&lt;=@asOf
 AND (CAST(@material AS text) IS NULL OR EXISTS (SELECT 1 FROM question_dependencies d WHERE d.effect_id=q.effect_id AND d.material_id=@material))
 ORDER BY q.company_id LIMIT 257</value></data>
-<data name="FindAnalysisReceipt" xml:space="preserve"><value>SELECT request_hash,payload_json FROM analysis_receipts WHERE company_id=@company AND news_material_id=@material AND news_version_id=@version</value></data>
+<data name="FindAnalysisReceipt" xml:space="preserve"><value>SELECT request_hash AS "RequestHash",payload_json AS "PayloadJson" FROM analysis_receipts WHERE company_id=@company AND news_material_id=@material AND news_version_id=@version</value></data>
 <data name="TransactionLock" xml:space="preserve"><value>SELECT pg_advisory_xact_lock(714103201)</value></data>
-<data name="RowsEnvelope" xml:space="preserve"><value>SELECT COALESCE(json_agg(row_to_json(rows)), '[]'::json)::text FROM ({0}) rows</value></data>
-<data name="AffectedRowsEnvelope" xml:space="preserve"><value>WITH affected AS ({0} RETURNING 1) SELECT COUNT(*) FROM affected</value></data>
 <data name="CreateUtcTicks" xml:space="preserve"><value>CREATE OR REPLACE FUNCTION insight_utc_ticks(value text) RETURNS bigint LANGUAGE sql IMMUTABLE STRICT AS $ticks$ SELECT (extract(epoch FROM regexp_replace(value, '\.[0-9]+', '')::timestamptz) * 10000000)::bigint + COALESCE(rpad(substring(value from '\.([0-9]+)'), 7, '0')::bigint, 0) + 621355968000000000 $ticks$;</value></data>
 </root>

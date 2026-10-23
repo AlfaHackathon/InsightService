@@ -15,10 +15,10 @@
 | `Api/Repositories/EffectRepository.cs` | Координатор одной атомарной транзакции receipt + revisions + heads |
 | `Api/Repositories/EffectReader.cs`, `EffectRevisionWriter.cs` | Чтение истории/состояния и запись ревизий в транзакции координатора |
 | `Api/Repositories/NewsJobRepository.cs`, `SourceCursorRepository.cs`, `SourceReactionRepository.cs` | Leases/checkpoints/audit, CAS cursor, invalidation и выбор затронутых вопросов |
-| `Api/Resources`, `Migrations` | 45 PostgreSQL SQL-ресурсов `.resx`, типизированные accessors, schema/backfill |
+| `Api/Resources`, `Migrations` | PostgreSQL SQL-ресурсы `.resx`, типизированные accessors, schema/backfill |
 | `Api/Common`, `Models/Persistence` | Общие сериализация/протокол/validation и внутренние persistence-модели |
 
-Репозитории используют организационный пакет `AlfaHackaton.DapperContext 1.1.0`: `IDapperContext.BeginTransaction`, `ITransaction`, `QueryObject`. Все чтения внутри операции идут через ту же транзакцию. В пакете нет transaction-aware list API, поэтому небольшой `Repositories/Postgres/PgSession` возвращает row JSON envelope через `ITransaction.CommandWithResponse`; он не открывает собственных Npgsql connections и не заменяет организационный DapperContext. Параметры передаются отдельно от SQL.
+Репозитории используют организационный пакет `AlfaHackaton.DapperContext 1.2.0`: `IDapperContext.BeginTransaction`, `ITransaction`, `QueryObject`. Все чтения внутри операции идут через ту же транзакцию. Согласованное расширение пакета добавляет `ITransaction.FirstOrDefault<T>`, `ListOrEmpty<T>` и `CommandWithCount`: прямые вызовы Dapper на том же соединении и транзакции. `Repositories/Postgres/InsightTransaction` только открывает транзакцию и берёт прежний advisory lock; собственного reader, JSON row envelope и мутации параметров нет. SQL возвращает типизированные persistence DTO с явными aliases; параметры передаются через `new { ... }` отдельно от SQL. JSON payloads и точные bigint ticks в базе сохранены.
 
 `AlfaHackaton.Controllers 1.4.0` используется через MVC `BaseController.OkOrProblem<T>`; успешный Result разворачивается в прежний JSON. Старые `{code,message}` ошибки сохраняет middleware. `AlfaHackaton.HttpClient 1.1.1` реально выполняет обращения к ContextService: `Response.Result`, timeout 15 секунд, без redirect, credential задаётся только для исходного запроса, максимальный буфер ответа 4 MiB. Никаких новых LLM-вызовов это внедрение не добавляет.
 

@@ -68,18 +68,32 @@ public sealed class MvcContractTests : IDisposable
     {
         using var factory = Factory();
         using var client = Authorized(factory);
-        using var empty = await client.PostAsJsonAsync("/insight-service/internal/news-jobs/claim", new { workerId = "worker" });
+        using var empty = await client.PostAsJsonAsync("/insight-service/internal/news-jobs/claim", new
+        {
+            workerId = "worker"
+        });
         Assert.Equal(HttpStatusCode.OK, empty.StatusCode);
         Assert.Equal("null", await empty.Content.ReadAsStringAsync());
         var responses = await Task.WhenAll(Enumerable.Range(0, 2).Select(sequence =>
-            client.PostAsJsonAsync("/insight-service/internal/source-cursor", new { version = 0, sequence, afterQuestion = (string?)null })));
+            client.PostAsJsonAsync("/insight-service/internal/source-cursor", new
+            {
+                version = 0,
+                sequence,
+                afterQuestion = (string?)null
+            })));
         try
         {
             Assert.Single(responses, response => response.StatusCode == HttpStatusCode.OK);
             var conflict = Assert.Single(responses, response => response.StatusCode == HttpStatusCode.Conflict);
             Assert.Contains("source_cursor_conflict", await conflict.Content.ReadAsStringAsync());
         }
-        finally { foreach (var response in responses) response.Dispose(); }
+        finally
+        {
+            foreach (var response in responses)
+            {
+                response.Dispose();
+            }
+        }
         using var current = await client.GetAsync("/insight-service/internal/source-cursor");
         using var json = JsonDocument.Parse(await current.Content.ReadAsStringAsync());
         Assert.Equal(1, json.RootElement.GetProperty("version").GetInt64());

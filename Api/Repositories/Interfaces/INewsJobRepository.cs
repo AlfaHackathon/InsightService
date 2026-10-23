@@ -4,7 +4,7 @@ namespace InsightService.Repositories.Interfaces;
 public interface INewsJobRepository
 {
     Task<NewsJob> Create(NewsJobRequest request);
-    Task<NewsJob> Get(string id);
+    Task<NewsJob> GetAsync(string id);
     Task<NewsJob?> Claim(JobClaim claim);
     Task<NewsJob> Update(string id, JobUpdate update);
     Task<NewsJob> Retry(string id);

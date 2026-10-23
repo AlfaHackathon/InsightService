@@ -11,7 +11,10 @@ public sealed class PgTestDatabase : IDisposable
     private readonly string admin = Environment.GetEnvironmentVariable("INSIGHT_TEST_POSTGRES")
         ?? "Host=127.0.0.1;Port=55441;Database=postgres;Username=postgres;Pooling=false";
     private readonly ServiceProvider services;
-    public string ConnectionString { get; }
+    public string ConnectionString
+    {
+        get;
+    }
     public IDapperContext Context => services.GetRequiredService<IDapperContext>();
     public PgTestDatabase()
     {

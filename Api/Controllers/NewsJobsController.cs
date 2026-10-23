@@ -1,9 +1,9 @@
+using System.Text.Json;
 using AlfaHackaton.Controllers.Controllers;
 using InsightService.Common;
 using InsightService.Contracts.NewsJobs;
 using InsightService.Repositories.Interfaces;
 using Microsoft.AspNetCore.Mvc;
-using System.Text.Json;
 namespace InsightService.Controllers;
 
 [ApiController]
@@ -19,7 +19,7 @@ public sealed class NewsJobsController(INewsJobRepository store) : BaseControlle
     [HttpPost("news-jobs/claim")]
     public async Task<IActionResult> Claim([FromBody] JobClaim request) => Content(JsonSerializer.Serialize(await store.Claim(request), AnalysisProtocol.Json), "application/json");
     [HttpGet("news-jobs/{jobId}")]
-    public async Task<IActionResult> Get([FromRoute] string jobId) => OkOrProblem<NewsJob>(await store.Get(jobId));
+    public async Task<IActionResult> Get([FromRoute] string jobId) => OkOrProblem<NewsJob>(await store.GetAsync(jobId));
     [HttpPost("news-jobs/{jobId}")]
     public async Task<IActionResult> Update([FromRoute] string jobId, [FromBody] JobUpdate request) => OkOrProblem<NewsJob>(await store.Update(jobId, request));
     [HttpPost("news-jobs/{jobId}/retry")]

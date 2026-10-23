@@ -1,7 +1,7 @@
 using AlfaHackaton.HttpClient;
-using InsightService.Settings;
 using InsightService.Services;
 using InsightService.Services.Interfaces;
+using InsightService.Settings;
 namespace InsightService.Extensions;
 
 public static class ContextSourceRegistration
