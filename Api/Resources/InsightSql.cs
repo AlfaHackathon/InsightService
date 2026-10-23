@@ -17,6 +17,10 @@ internal static class InsightSql
     internal static string ReadSourceCursor => Required(nameof(ReadSourceCursor));
     internal static string ReadSourceCursorVersion => Required(nameof(ReadSourceCursorVersion));
     internal static string UpsertSourceCursor => Required(nameof(UpsertSourceCursor));
+    internal static string InitializeNamedSourceCursors => Required(nameof(InitializeNamedSourceCursors));
+    internal static string ReadNamedSourceCursor => Required(nameof(ReadNamedSourceCursor));
+    internal static string ReadNamedSourceCursorVersion => Required(nameof(ReadNamedSourceCursorVersion));
+    internal static string UpsertNamedSourceCursor => Required(nameof(UpsertNamedSourceCursor));
     internal static string FindClaimableJob => Required(nameof(FindClaimableJob));
     internal static string FindClaimableJobById => Required(nameof(FindClaimableJobById));
     internal static string ReadJob => Required(nameof(ReadJob));

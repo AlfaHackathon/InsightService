@@ -18,6 +18,10 @@ CREATE TABLE IF NOT EXISTS news_job_events (job_id TEXT NOT NULL, version BIGINT
     payload TEXT NOT NULL, PRIMARY KEY(job_id,version));
 CREATE TABLE IF NOT EXISTS source_cursor (id BIGINT PRIMARY KEY CHECK(id=1), version BIGINT NOT NULL, payload TEXT NOT NULL);</value></data>
 <data name="FindJobRequest" xml:space="preserve"><value>SELECT request_hash AS "RequestHash",payload AS "Payload" FROM news_jobs WHERE job_id=@id</value></data>
+<data name="InitializeNamedSourceCursors" xml:space="preserve"><value>CREATE TABLE IF NOT EXISTS named_source_cursors (source TEXT PRIMARY KEY, version BIGINT NOT NULL, payload TEXT NOT NULL)</value></data>
+<data name="ReadNamedSourceCursor" xml:space="preserve"><value>SELECT payload FROM named_source_cursors WHERE source=@source</value></data>
+<data name="ReadNamedSourceCursorVersion" xml:space="preserve"><value>SELECT version FROM named_source_cursors WHERE source=@source</value></data>
+<data name="UpsertNamedSourceCursor" xml:space="preserve"><value>INSERT INTO named_source_cursors VALUES(@source,@v,@p) ON CONFLICT(source) DO UPDATE SET version=excluded.version,payload=excluded.payload</value></data>
 <data name="ReadSourceCursor" xml:space="preserve"><value>SELECT payload FROM source_cursor WHERE id=1</value></data>
 <data name="ReadSourceCursorVersion" xml:space="preserve"><value>SELECT version FROM source_cursor WHERE id=1</value></data>
 <data name="UpsertSourceCursor" xml:space="preserve"><value>INSERT INTO source_cursor VALUES(1,@v,@p) ON CONFLICT(id) DO UPDATE SET version=excluded.version,payload=excluded.payload</value></data>

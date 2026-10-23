@@ -3,7 +3,11 @@ using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using AlfaHackaton.Controllers.Controllers;
+using InsightService.Contracts.Analyses;
+using InsightService.Contracts.Calculations;
 using InsightService.Controllers;
+using InsightService.Models.Policies;
+using InsightService.Repositories;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
@@ -24,6 +28,58 @@ public sealed class MvcContractTests : IDisposable
         var client = factory.CreateClient();
         client.DefaultRequestHeaders.Add("X-Internal-Secret", "synthetic-mvc-test-internal");
         return client;
+    }
+
+    [Fact]
+    public async Task DomainToolsUsePersistedFactsNormalizeQuestionsAndSeparateSourceCursors()
+    {
+        var company = Guid.NewGuid();
+        var asOf = DateTimeOffset.Parse("2026-10-24T08:00:00Z");
+        var calculation = new Calculation(new ExpressionNode("value", "9007199254740993.11"), "RUB", "2026");
+        var draft = new EffectDraft("debt", "contract", null, "Canonical", "forecast", [], calculation,
+            new("cost", "annual_run_rate", "contract", "supported", 5, 5, 5));
+        var request = new AnalysisRequest(company, null, "news", "v1", asOf, [draft], ContextComplete: true);
+        var saved = (await new EffectRepository(database.Context).Save(request, "synthetic-contract", [new(draft, "9007199254740993.11")])).RequireContent();
+        using var factory = Factory();
+        using var client = Authorized(factory);
+        var forged = saved with
+        {
+            Effects = [saved.Effects[0] with { CurrentRevision = saved.Effects[0].CurrentRevision with { CalculationResult = "0" } }]
+        };
+        using var projection = await client.PostAsJsonAsync("/insight-service/internal/projections/canonical-facts", new
+        {
+            asOf,
+            companies = new[] { new { companyId = company, status = "completed", receipt = forged } }
+        });
+        Assert.Equal(HttpStatusCode.OK, projection.StatusCode);
+        var facts = (await projection.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("facts");
+        Assert.Equal("9007199254740993.11", facts[0].GetProperty("revision").GetProperty("calculationResult").GetString());
+        Assert.Equal(100, facts[0].GetProperty("priority").GetInt32());
+        var total = ProjectionPolicy.Group(new("group", [company], [], [], true, [], "sum_compatible_owner_effects"),
+            [new(company, "completed", saved, ContextComplete: true)]).Totals.Single();
+        Assert.Equal("9007199254740993.11", total.FullTotal);
+
+        using var prepare = await client.PostAsJsonAsync("/insight-service/internal/analyses/prepare", new
+        {
+            request,
+            drafts = new[] { draft with { Question = new("liquidity", "event_only", "qualitative", "2026", "2025", "unknown") } }
+        });
+        Assert.Equal(HttpStatusCode.OK, prepare.StatusCode);
+        var prepared = (await prepare.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("drafts")[0];
+        Assert.StartsWith("question-", prepared.GetProperty("effectKey").GetString());
+        Assert.Equal("unknown", prepared.GetProperty("question").GetProperty("targetPeriod").GetString());
+        Assert.Equal("qualitative", prepared.GetProperty("question").GetProperty("basis").GetString());
+        using var advanced = await client.PostAsJsonAsync("/insight-service/internal/source-cursor?source=company", new
+        {
+            version = 0,
+            sequence = 17,
+            afterQuestion = (string?)null
+        });
+        Assert.Equal(HttpStatusCode.OK, advanced.StatusCode);
+        var contextCursor = await client.GetFromJsonAsync<JsonElement>("/insight-service/internal/source-cursor");
+        var companyCursor = await client.GetFromJsonAsync<JsonElement>("/insight-service/internal/source-cursor?source=company");
+        Assert.Equal(0, contextCursor.GetProperty("sequence").GetInt64());
+        Assert.Equal(17, companyCursor.GetProperty("sequence").GetInt64());
     }
 
     [Fact]

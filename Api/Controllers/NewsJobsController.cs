@@ -13,9 +13,10 @@ public sealed class NewsJobsController(INewsJobRepository store) : BaseControlle
     [HttpPost("news-jobs")]
     public async Task<IActionResult> Create([FromBody] NewsJobRequest request) => OkOrProblem<NewsJob>(await store.Create(request));
     [HttpGet("source-cursor")]
-    public async Task<IActionResult> Cursor() => OkOrProblem<SourceCursor>(await store.GetSourceCursor());
+    public async Task<IActionResult> Cursor([FromQuery] string source = "context") => source is "context" or "company"
+        ? OkOrProblem<SourceCursor>(await store.GetSourceCursor(source)) : BadRequest();
     [HttpPost("source-cursor")]
-    public async Task<IActionResult> SaveCursor([FromBody] SourceCursor cursor) => OkOrProblem<SourceCursor>(await store.SaveSourceCursor(cursor));
+    public async Task<IActionResult> SaveCursor([FromBody] SourceCursor cursor, [FromQuery] string source = "context") => OkOrProblem<SourceCursor>(await store.SaveSourceCursor(cursor, source));
     [HttpPost("news-jobs/claim")]
     public async Task<IActionResult> Claim([FromBody] JobClaim request)
     {

@@ -42,10 +42,16 @@ dotnet publish Api/InsightService.Api.csproj -c Release --no-restore -o ./publis
 # Internal__Secret: internal credential, задаётся окружением процесса.
 # ContextService__BaseUrl: http://127.0.0.1:5181 (корень host).
 # ContextService__InternalSecret: отдельный credential либо Internal__Secret.
+# CompanyService__BaseUrl: корень host CompanyService.
+# CompanyService__InternalSecret: отдельный credential либо Internal__Secret.
 dotnet run --no-build --project Api/InsightService.Api.csproj --urls http://127.0.0.1:5182
 ```
 
 `Storage__ConnectionString` также поддерживается как явное имя настройки; `Storage__Path` больше не выбирает SQLite. Старую базу нужно переносить отдельным проверяемым importer до переключения приложения.
+
+Владение правилами проекций находится в InsightService: `POST /insight-service/internal/projections/canonical-facts`, `/groups`, `/role` возвращают канонические факты, приоритеты, точные групповые суммы и разрешённые ролевые представления. Входящие receipts служат только идентификаторами: значения и актуальные головы перечитываются из собственной БД на `asOf`. Группы и явные ролевые grants разрешаются через CompanyService; доступ к исходникам, hash и время версии проверяются через ContextService. Сведения о компаниях, людях и группах принадлежат CompanyService.
+
+`POST /insight-service/internal/analyses/canonical-company`, `/applicability`, `/prepare`, `/depth` выполняют выбор канонического receipt, атомарную запись неглубокой оценки, нормализацию устойчивого вопроса/предшественника и выбор глубины. `/depth` получает собственную инвентаризацию ContextService и профиль CompanyService; переданная агентом инвентаризация не определяет решение. Сохранение `/analyses` остаётся окончательной проверкой источников и применимости. `GET/POST /source-cursor?source=company` хранит отдельный checkpoint изменений CompanyService; без параметра сохраняется прежний курсор ContextService.
 
 Тесты используют настоящий PostgreSQL: `INSIGHT_TEST_POSTGRES` — admin connection string с правом CREATE DATABASE только на изолированном тестовом instance. Если переменная отсутствует, тестовый fixture ожидает disposable localhost:55441/database=postgres/user=postgres. Каждая test instance создаёт собственную `insight_test_<random>` БД, прогоняет организационные миграции и удаляет только эту БД после проверки. Production DSN тестам не передаётся.
 

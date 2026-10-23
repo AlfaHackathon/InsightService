@@ -82,8 +82,8 @@ public sealed class NewsJobRepository(IDapperContext context) : INewsJobReposito
         return new(readResult, null);
     }
 
-    public Task<SourceCursor> GetSourceCursor() => new SourceCursorRepository(context).GetSourceCursor();
-    public Task<Result<SourceCursor>> SaveSourceCursor(SourceCursor cursor) => new SourceCursorRepository(context).SaveSourceCursor(cursor);
+    public Task<SourceCursor> GetSourceCursor(string source = "context") => new SourceCursorRepository(context).GetSourceCursor(source);
+    public Task<Result<SourceCursor>> SaveSourceCursor(SourceCursor cursor, string source = "context") => new SourceCursorRepository(context).SaveSourceCursor(cursor, source);
     public async Task<Result<NewsJob?>> Claim(JobClaim claim)
     {
         if (RequestValidation.RequireId(claim.WorkerId, "workerId").Error is { } workerIdError)

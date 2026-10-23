@@ -24,6 +24,8 @@ public static class ServiceRegistration
         builder.Services.AddScoped<IEffectRepository, EffectRepository>();
         builder.Services.AddContextSourceResolver();
         builder.Services.AddScoped<IAnalysisService, AnalysisService>();
+        builder.Services.AddScoped<ProjectionService>();
+        builder.Services.AddScoped<AnalysisPreparationService>();
         builder.Services.AddScoped<INewsJobRepository, NewsJobRepository>();
     }
 }

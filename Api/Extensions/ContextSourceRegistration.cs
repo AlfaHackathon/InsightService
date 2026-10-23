@@ -11,6 +11,10 @@ public static class ContextSourceRegistration
         services.AddAlfaHttpClient(new ContextHttpSettings())
             .ConfigureHttpClient(client => client.MaxResponseContentBufferSize = 4 * 1024 * 1024);
         services.AddTransient<ISourceResolver, ContextSourceResolver>();
+        services.AddTransient<ContextEvidenceClient>();
+        services.AddAlfaHttpClient(new CompanyHttpSettings())
+            .ConfigureHttpClient(client => client.MaxResponseContentBufferSize = 4 * 1024 * 1024);
+        services.AddTransient<CompanyKnowledgeClient>();
         return services;
     }
 }
