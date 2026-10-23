@@ -1,5 +1,4 @@
 using System.Text.Json;
-using AlfaHackaton.Controllers.Controllers;
 using InsightService.Common;
 using InsightService.Contracts.NewsJobs;
 using InsightService.Repositories.Interfaces;
@@ -8,7 +7,7 @@ namespace InsightService.Controllers;
 
 [ApiController]
 [Route("insight-service/internal")]
-public sealed class NewsJobsController(INewsJobRepository store) : BaseController
+public sealed class NewsJobsController(INewsJobRepository store) : ApiControllerBase
 {
     [HttpPost("news-jobs")]
     public async Task<IActionResult> Create([FromBody] NewsJobRequest request) => OkOrProblem<NewsJob>(await store.Create(request));
@@ -17,7 +16,11 @@ public sealed class NewsJobsController(INewsJobRepository store) : BaseControlle
     [HttpPost("source-cursor")]
     public async Task<IActionResult> SaveCursor([FromBody] SourceCursor cursor) => OkOrProblem<SourceCursor>(await store.SaveSourceCursor(cursor));
     [HttpPost("news-jobs/claim")]
-    public async Task<IActionResult> Claim([FromBody] JobClaim request) => Content(JsonSerializer.Serialize(await store.Claim(request), AnalysisProtocol.Json), "application/json");
+    public async Task<IActionResult> Claim([FromBody] JobClaim request)
+    {
+        var result = await store.Claim(request);
+        return result.Error is not null ? OkOrProblem(result) : Content(JsonSerializer.Serialize(result.Content, AnalysisProtocol.Json), "application/json");
+    }
     [HttpGet("news-jobs/{jobId}")]
     public async Task<IActionResult> Get([FromRoute] string jobId) => OkOrProblem<NewsJob>(await store.GetAsync(jobId));
     [HttpPost("news-jobs/{jobId}")]

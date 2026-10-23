@@ -3,7 +3,6 @@ using System.Text;
 using System.Text.Json;
 using AlfaHackaton.HttpClient.Http;
 using InsightService.Contracts.Context;
-using InsightService.Models;
 using InsightService.Services;
 using InsightService.Settings;
 using Microsoft.Extensions.Configuration;
@@ -11,12 +10,7 @@ using Xunit;
 
 public sealed class OrganizationHttpClientTests
 {
-    private static IConfiguration Configuration() => new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
-    {
-        ["ContextService:BaseUrl"] = "https://synthetic.invalid",
-        ["ContextService:InternalSecret"] = "synthetic-test-credential"
-    }).Build();
-
+    private static IConfiguration Configuration() => new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["ContextService:BaseUrl"] = "https://synthetic.invalid", ["ContextService:InternalSecret"] = "synthetic-test-credential" }).Build();
     [Fact]
     public async Task RealOrganizationResponseResultPreservesMaterialIdentityTicksAndHeaderScope()
     {
@@ -28,15 +22,12 @@ public sealed class OrganizationHttpClientTests
             Assert.Equal("synthetic-test-credential", Assert.Single(request.Headers.GetValues("X-Internal-Secret")));
             Assert.Null(request.Headers.Authorization);
             Assert.False(request.Headers.Contains("X-User-Id"));
-            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
-            {
-                Content = new StringContent(JsonSerializer.Serialize(material), Encoding.UTF8, "application/json")
-            });
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(JsonSerializer.Serialize(material), Encoding.UTF8, "application/json") });
         }));
         var settings = new ContextHttpSettings();
         var client = new HttpClient<ContextHttpSettings>(transport, settings);
         var resolver = new ContextSourceResolver(client, Configuration());
-        var resolved = await resolver.GetAsync("news", "v1", CancellationToken.None);
+        var resolved = await (resolver.GetAsync("news", "v1", CancellationToken.None)).RequireContentAsync();
         Assert.Equal(material, resolved with
         {
             CompanyIds = material.CompanyIds,
@@ -54,12 +45,9 @@ public sealed class OrganizationHttpClientTests
     [InlineData(503, 502, "context_rejected")]
     public async Task OrganizationClientPreservesUpstreamStatusMapping(int status, int expected, string code)
     {
-        using var transport = new System.Net.Http.HttpClient(new Handler((_, _) => Task.FromResult(new HttpResponseMessage((HttpStatusCode)status)
-        {
-            Content = new StringContent("{\"upstream\":\"failure\"}")
-        })));
+        using var transport = new System.Net.Http.HttpClient(new Handler((_, _) => Task.FromResult(new HttpResponseMessage((HttpStatusCode)status) { Content = new StringContent("{\"upstream\":\"failure\"}") })));
         var resolver = new ContextSourceResolver(new HttpClient<ContextHttpSettings>(transport, new()), Configuration());
-        var error = await Assert.ThrowsAsync<ApiException>(() => resolver.GetAsync("news", "v1", CancellationToken.None));
+        var error = await ResultAssert.ErrorAsync(() => resolver.GetAsync("news", "v1", CancellationToken.None));
         Assert.Equal(expected, error.StatusCode);
         Assert.Equal(code, error.Code);
     }
@@ -76,13 +64,10 @@ public sealed class OrganizationHttpClientTests
             Timeout = TimeSpan.FromMilliseconds(30)
         };
         var resolver = new ContextSourceResolver(new HttpClient<ContextHttpSettings>(slow, new()), Configuration());
-        Assert.Equal("context_timeout", (await Assert.ThrowsAsync<ApiException>(() => resolver.GetAsync("news", "v1", CancellationToken.None))).Code);
-        using var invalid = new System.Net.Http.HttpClient(new Handler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
-        {
-            Content = new StringContent("{")
-        })));
+        Assert.Equal("context_timeout", (await ResultAssert.ErrorAsync(() => resolver.GetAsync("news", "v1", CancellationToken.None))).Code);
+        using var invalid = new System.Net.Http.HttpClient(new Handler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{") })));
         resolver = new(new HttpClient<ContextHttpSettings>(invalid, new()), Configuration());
-        Assert.Equal("invalid_context_response", (await Assert.ThrowsAsync<ApiException>(() => resolver.GetAsync("news", "v1", CancellationToken.None))).Code);
+        Assert.Equal("invalid_context_response", (await ResultAssert.ErrorAsync(() => resolver.GetAsync("news", "v1", CancellationToken.None))).Code);
     }
 
     private sealed class Handler(Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> send) : HttpMessageHandler

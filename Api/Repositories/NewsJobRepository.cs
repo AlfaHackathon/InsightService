@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using AlfaHackaton.DapperContext.Common.Interfaces.Dapper;
 using AlfaHackaton.DapperContext.Dapper;
+using AlfaHackaton.Result;
 using InsightService.Common;
 using InsightService.Contracts.NewsJobs;
 using InsightService.Models;
@@ -15,15 +16,27 @@ namespace InsightService.Repositories;
 
 public sealed class NewsJobRepository(IDapperContext context) : INewsJobRepository
 {
-    public async Task<NewsJob> Create(NewsJobRequest request)
+    public async Task<Result<NewsJob>> Create(NewsJobRequest request)
     {
-        RequestValidation.RequireId(request.JobId, "jobId");
-        RequestValidation.RequireId(request.NewsMaterialId, "newsMaterialId");
-        RequestValidation.RequireId(request.NewsVersionId, "newsVersionId");
-        if (request.AsOf == default || request.Parameters.ValueKind != JsonValueKind.Object || request.Parameters.GetRawText().Length > 32000)
+        if (RequestValidation.RequireId(request.JobId, "jobId").Error is { } jobIdError)
         {
-            throw new ApiException(400, "invalid_job", "A job requires asOf and bounded object parameters.");
+            return new(jobIdError);
         }
+        if (RequestValidation.RequireId(request.NewsMaterialId, "newsMaterialId").Error is { } newsMaterialIdError)
+        {
+            return new(newsMaterialIdError);
+        }
+        if (RequestValidation.RequireId(request.NewsVersionId, "newsVersionId").Error is { } newsVersionIdError)
+        {
+            return new(newsVersionIdError);
+        }
+        if (request.AsOf == default ||
+            request.Parameters.ValueKind != JsonValueKind.Object ||
+            request.Parameters.GetRawText().Length > 32000)
+        {
+            return new(new ApiError(400, "invalid_job", "A job requires asOf and bounded object parameters."));
+        }
+
         request = request with
         {
             AsOf = request.AsOf.ToUniversalTime()
@@ -38,35 +51,46 @@ public sealed class NewsJobRepository(IDapperContext context) : INewsJobReposito
         {
             if (existing.RequestHash != hash)
             {
-                throw new ApiException(409, "job_request_conflict", "A job ID cannot be reused with another request.");
+                return new(new ApiError(409, "job_request_conflict", "A job ID cannot be reused with another request."));
             }
-            return JsonSerializer.Deserialize<NewsJob>(existing.Payload, AnalysisProtocol.Json)!;
+
+            return new(JsonSerializer.Deserialize<NewsJob>(existing.Payload, AnalysisProtocol.Json)!, null);
         }
+
         var job = new NewsJob(request, "queued", 0, null, null, JsonSerializer.SerializeToElement(new
         {
         }), null, DateTimeOffset.UtcNow);
         await Write(transaction, job, hash);
         transaction.Commit();
-        return job;
+        return new(job, null);
     }
 
-    public async Task<NewsJob> GetAsync(string id)
+    public async Task<Result<NewsJob>> GetAsync(string id)
     {
-        RequestValidation.RequireId(id, "jobId");
+        if (RequestValidation.RequireId(id, "jobId").Error is { } jobIdError2)
+        {
+            return new(jobIdError2);
+        }
         using var transaction = await InsightTransaction.OpenAsync(context);
-        return await Read(transaction, id) ?? throw new ApiException(404, "job_not_found", "News job was not found.");
+        var readResult = await Read(transaction, id);
+        if (readResult is null)
+        {
+            return new(new ApiError(404, "job_not_found", "News job was not found."));
+        }
+
+        return new(readResult, null);
     }
 
     public Task<SourceCursor> GetSourceCursor() => new SourceCursorRepository(context).GetSourceCursor();
-
-    public Task<SourceCursor> SaveSourceCursor(SourceCursor cursor) => new SourceCursorRepository(context).SaveSourceCursor(cursor);
-
-    public async Task<NewsJob?> Claim(JobClaim claim)
+    public Task<Result<SourceCursor>> SaveSourceCursor(SourceCursor cursor) => new SourceCursorRepository(context).SaveSourceCursor(cursor);
+    public async Task<Result<NewsJob?>> Claim(JobClaim claim)
     {
-        RequestValidation.RequireId(claim.WorkerId, "workerId");
+        if (RequestValidation.RequireId(claim.WorkerId, "workerId").Error is { } workerIdError)
+        {
+            return new(workerIdError);
+        }
         using var transaction = await InsightTransaction.OpenAsync(context);
-        var id = await transaction.FirstOrDefault<string>(new QueryObject(
-            claim.JobId is null ? InsightSql.FindClaimableJob : InsightSql.FindClaimableJobById,
+        var id = await transaction.FirstOrDefault<string>(new QueryObject(claim.JobId is null ? InsightSql.FindClaimableJob : InsightSql.FindClaimableJobById,
             new
             {
                 now = DateTimeOffset.UtcNow.UtcTicks,
@@ -74,8 +98,9 @@ public sealed class NewsJobRepository(IDapperContext context) : INewsJobReposito
             }));
         if (id is null)
         {
-            return null;
+            return new(null, null);
         }
+
         var old = (await Read(transaction, id))!;
         var now = DateTimeOffset.UtcNow;
         var next = old with
@@ -89,24 +114,40 @@ public sealed class NewsJobRepository(IDapperContext context) : INewsJobReposito
         };
         await Write(transaction, next);
         transaction.Commit();
-        return next;
+        return new(next, null);
     }
 
-    public async Task<NewsJob> Update(string id, JobUpdate update)
+    public async Task<Result<NewsJob>> Update(string id, JobUpdate update)
     {
-        RequestValidation.RequireId(update.WorkerId, "workerId");
-        if (update.Status is not ("running" or "partial" or "completed" or "failed") || update.Checkpoint.ValueKind != JsonValueKind.Object
-            || update.Checkpoint.GetRawText().Length > 4000000 || update.Error?.Length > 2000)
+        if (RequestValidation.RequireId(update.WorkerId, "workerId").Error is { } workerIdError2)
         {
-            throw new ApiException(400, "invalid_job_update", "Status and bounded checkpoint/error are required.");
+            return new(workerIdError2);
         }
+        if (update.Status is not ("running" or "partial" or "completed" or "failed") ||
+            update.Checkpoint.ValueKind != JsonValueKind.Object ||
+            update.Checkpoint.GetRawText().Length > 4000000 ||
+            update.Error?.Length > 2000)
+        {
+            return new(new ApiError(400, "invalid_job_update", "Status and bounded checkpoint/error are required."));
+        }
+
         using var transaction = await InsightTransaction.OpenAsync(context);
-        var old = await Read(transaction, id) ?? throw new ApiException(404, "job_not_found", "News job was not found.");
-        var now = DateTimeOffset.UtcNow;
-        if (old.Status != "running" || old.WorkerId != update.WorkerId || old.Version != update.Version || old.LeaseUntil < now)
+        var readResult2 = await Read(transaction, id);
+        if (readResult2 is null)
         {
-            throw new ApiException(409, "job_lease_conflict", "This worker no longer owns the current job lease/version.");
+            return new(new ApiError(404, "job_not_found", "News job was not found."));
         }
+
+        var old = readResult2;
+        var now = DateTimeOffset.UtcNow;
+        if (old.Status != "running" ||
+            old.WorkerId != update.WorkerId ||
+            old.Version != update.Version ||
+            old.LeaseUntil < now)
+        {
+            return new(new ApiError(409, "job_lease_conflict", "This worker no longer owns the current job lease/version."));
+        }
+
         var next = old with
         {
             Status = update.Status,
@@ -118,18 +159,28 @@ public sealed class NewsJobRepository(IDapperContext context) : INewsJobReposito
         };
         await Write(transaction, next);
         transaction.Commit();
-        return next;
+        return new(next, null);
     }
 
-    public async Task<NewsJob> Retry(string id)
+    public async Task<Result<NewsJob>> Retry(string id)
     {
-        RequestValidation.RequireId(id, "jobId");
+        if (RequestValidation.RequireId(id, "jobId").Error is { } jobIdError3)
+        {
+            return new(jobIdError3);
+        }
         using var transaction = await InsightTransaction.OpenAsync(context);
-        var old = await Read(transaction, id) ?? throw new ApiException(404, "job_not_found", "News job was not found.");
+        var readResult3 = await Read(transaction, id);
+        if (readResult3 is null)
+        {
+            return new(new ApiError(404, "job_not_found", "News job was not found."));
+        }
+
+        var old = readResult3;
         if (old.Status != "failed")
         {
-            throw new ApiException(409, "job_not_failed", "Only explicitly failed jobs can be retried.");
+            return new(new ApiError(409, "job_not_failed", "Only explicitly failed jobs can be retried."));
         }
+
         var next = old with
         {
             Status = "queued",
@@ -140,7 +191,7 @@ public sealed class NewsJobRepository(IDapperContext context) : INewsJobReposito
         };
         await Write(transaction, next);
         transaction.Commit();
-        return next;
+        return new(next, null);
     }
 
     private static async Task<NewsJob?> Read(ITransaction transaction, string id)
@@ -155,17 +206,18 @@ public sealed class NewsJobRepository(IDapperContext context) : INewsJobReposito
     private static async Task Write(ITransaction transaction, NewsJob job, string? hash = null)
     {
         var payload = JsonSerializer.Serialize(job, AnalysisProtocol.Json);
-        await transaction.Command(new QueryObject(hash is not null ? InsightSql.InsertJob : InsightSql.UpdateJob, new
-        {
-            id = job.Request.JobId,
-            hash,
-            s = job.Status,
-            v = job.Version,
-            w = job.WorkerId,
-            l = job.LeaseUntil?.UtcTicks,
-            t = job.UpdatedAt.UtcTicks,
-            p = payload
-        }));
+        await transaction.Command(new QueryObject(hash is not null ? InsightSql.InsertJob : InsightSql.UpdateJob,
+            new
+            {
+                id = job.Request.JobId,
+                hash,
+                s = job.Status,
+                v = job.Version,
+                w = job.WorkerId,
+                l = job.LeaseUntil?.UtcTicks,
+                t = job.UpdatedAt.UtcTicks,
+                p = payload
+            }));
         await transaction.Command(new QueryObject(InsightSql.InsertJobEvent, new
         {
             id = job.Request.JobId,

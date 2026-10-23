@@ -1,6 +1,7 @@
 using System.Text.Json;
 using AlfaHackaton.DapperContext.Common.Interfaces.Dapper;
 using AlfaHackaton.DapperContext.Dapper;
+using AlfaHackaton.Result;
 using InsightService.Common;
 using InsightService.Contracts.NewsJobs;
 using InsightService.Models;
@@ -18,29 +19,31 @@ internal sealed class SourceCursorRepository(IDapperContext context)
         return json is null ? new SourceCursor(0, 0, null) : JsonSerializer.Deserialize<SourceCursor>(json, AnalysisProtocol.Json)!;
     }
 
-    public async Task<SourceCursor> SaveSourceCursor(SourceCursor cursor)
+    public async Task<Result<SourceCursor>> SaveSourceCursor(SourceCursor cursor)
     {
-        if (cursor.Sequence < 0 || cursor.AfterQuestion?.Length > 200)
+        if (cursor.Sequence < 0 ||
+            cursor.AfterQuestion?.Length > 200)
         {
-            throw new ApiException(400, "invalid_source_cursor", "A bounded source cursor is required.");
+            return new(new ApiError(400, "invalid_source_cursor", "A bounded source cursor is required."));
         }
+
         using var transaction = await InsightTransaction.OpenAsync(context);
         var version = await transaction.FirstOrDefault<long?>(new QueryObject(InsightSql.ReadSourceCursorVersion)) ?? 0;
         if (version != cursor.Version)
         {
-            throw new ApiException(409, "source_cursor_conflict", "Another consumer advanced the source cursor.");
+            return new(new ApiError(409, "source_cursor_conflict", "Another consumer advanced the source cursor."));
         }
+
         var next = cursor with
         {
             Version = cursor.Version + 1
         };
-        await transaction.Command(new QueryObject(InsightSql.UpsertSourceCursor,
-            new
-            {
-                v = next.Version,
-                p = JsonSerializer.Serialize(next, AnalysisProtocol.Json)
-            }));
+        await transaction.Command(new QueryObject(InsightSql.UpsertSourceCursor, new
+        {
+            v = next.Version,
+            p = JsonSerializer.Serialize(next, AnalysisProtocol.Json)
+        }));
         transaction.Commit();
-        return next;
+        return new(next, null);
     }
 }

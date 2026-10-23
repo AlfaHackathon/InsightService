@@ -8,6 +8,7 @@
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="AlfaHackaton.Result" Version="1.0.0" />
     <PackageReference Include="AlfaHackaton.Controllers" Version="1.4.0" />
     <PackageReference Include="AlfaHackaton.DapperContext" Version="1.2.0" />
     <PackageReference Include="AlfaHackaton.HttpClient" Version="1.1.1" />

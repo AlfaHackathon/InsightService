@@ -27,15 +27,23 @@ internal static class EffectReader
         var revisions = await transaction.ListOrEmpty<string>(
             new QueryObject(canonical ? InsightSql.ReadQuestionHistory : InsightSql.ReadEffectHistory, parameters));
         var history = revisions.Select(json => JsonSerializer.Deserialize<EffectRevision>(json, AnalysisProtocol.Json)!).ToArray();
-        var invalidated = canonical && await transaction.CommandWithResponse<bool>(
+        var invalidated = canonical &&
+            await transaction.CommandWithResponse<bool>(
             new QueryObject(InsightSql.HasPendingInvalidation, new
             {
                 id = effectId,
                 asof = asOf?.UtcTicks ?? long.MaxValue
             }));
 
-        return new EffectResponse(effectId, head.EffectKey, head.CompanyId, head.BankProfileId,
-            head.NewsMaterialId, head.LiteralObjectRef, history.Single(r => r.RevisionId == head.CurrentRevisionId), history, invalidated);
+        return new EffectResponse(effectId,
+            head.EffectKey,
+            head.CompanyId,
+            head.BankProfileId,
+            head.NewsMaterialId,
+            head.LiteralObjectRef,
+            history.Single(r => r.RevisionId == head.CurrentRevisionId),
+            history,
+            invalidated);
     }
 
 }

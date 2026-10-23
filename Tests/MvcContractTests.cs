@@ -64,6 +64,57 @@ public sealed class MvcContractTests : IDisposable
     }
 
     [Fact]
+    public async Task ReturnedValidationErrorPreservesCodeAndStatus()
+    {
+        using var factory = Factory();
+        using var client = Authorized(factory);
+        using var response = await client.PostAsJsonAsync("/insight-service/internal/analyses", new
+        {
+            companyId = Guid.NewGuid(),
+            newsMaterialId = "news",
+            newsVersionId = "v1",
+            asOf = "2026-10-23T10:00:00Z",
+            drafts = new[]
+            {
+                new
+                {
+                    effectKey = "effect",
+                    literalObjectRef = "contract",
+                    conclusion = "Synthetic conclusion",
+                    status = "forecast",
+                    modelExplanation = new string('x', 16001),
+                    sourceRefs = new[] { new { materialId = "news", versionId = "v1", contentHash = new string('a', 64) } }
+                }
+            }
+        });
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.Equal("invalid_model_explanation", json.RootElement.GetProperty("code").GetString());
+        Assert.Equal("Raw model explanation must be bounded.", json.RootElement.GetProperty("message").GetString());
+        Assert.Equal(2, json.RootElement.EnumerateObject().Count());
+    }
+
+    [Fact]
+    public async Task PreviewIncludesReturnedCalculationErrorsWithoutFailingTheBatch()
+    {
+        using var factory = Factory();
+        using var client = Authorized(factory);
+        using var response = await client.PostAsJsonAsync("/insight-service/internal/calculations/preview", new[]
+        {
+            new { expression = new { kind = "divide", left = new { kind = "value", value = "2" }, right = new { kind = "value", value = "1" } }, unit = "RUB", period = "2026" },
+            new { expression = new { kind = "divide", left = new { kind = "value", value = "2" }, right = new { kind = "value", value = "0" } }, unit = "RUB", period = "2026" }
+        });
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var rows = json.RootElement.GetProperty("results");
+        Assert.True(rows[0].GetProperty("valid").GetBoolean());
+        Assert.Equal("2", rows[0].GetProperty("result").GetString());
+        Assert.False(rows[1].GetProperty("valid").GetBoolean());
+        Assert.Equal("division_by_zero", rows[1].GetProperty("code").GetString());
+        Assert.False(rows[1].TryGetProperty("result", out _));
+    }
+
+    [Fact]
     public async Task MvcNullClaimAndPostgresCursorCompareAndSwapRemainObservable()
     {
         using var factory = Factory();

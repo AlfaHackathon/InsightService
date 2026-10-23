@@ -2,7 +2,6 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using InsightService.Extensions;
-using InsightService.Models;
 using InsightService.Services.Interfaces;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -26,26 +25,16 @@ public sealed class ContextRedirectTests
             var destinationUrl = $"http://127.0.0.1:{((IPEndPoint)destination.LocalEndpoint).Port}/redirected-material";
             var originObservation = Serve(origin, "302 Found", $"Location: {destinationUrl}\r\n", "", syntheticSecret, deadline.Token);
             var destinationObservation = ObserveDestination(destination, syntheticSecret, destinationDeadline.Token);
-            var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["ContextService:BaseUrl"] = originUrl,
-                ["ContextService:InternalSecret"] = syntheticSecret
-            }).Build();
+            var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["ContextService:BaseUrl"] = originUrl, ["ContextService:InternalSecret"] = syntheticSecret }).Build();
             var services = new ServiceCollection();
             services.AddSingleton<IConfiguration>(configuration);
             services.AddContextSourceResolver();
             using var provider = services.BuildServiceProvider();
             var resolver = provider.GetRequiredService<ISourceResolver>();
-            ApiException? failure = null;
-            try
-            {
-                await resolver.GetAsync("news", "v1", deadline.Token);
-            }
-            catch (ApiException e) { failure = e; }
+            var failure = await ResultAssert.ErrorAsync(() => resolver.GetAsync("news", "v1", deadline.Token));
             var originSawSecret = await originObservation;
             destinationDeadline.CancelAfter(TimeSpan.FromSeconds(1));
             var destinationSaw = await destinationObservation;
-
             Assert.True(originSawSecret);
             Assert.False(destinationSaw.RequestReceived);
             Assert.False(destinationSaw.SecretReceived);
@@ -53,11 +42,14 @@ public sealed class ContextRedirectTests
             Assert.Equal(502, failure.StatusCode);
             Assert.Equal("context_rejected", failure.Code);
         }
-        finally { origin.Stop(); destination.Stop(); }
+        finally
+        {
+            origin.Stop();
+            destination.Stop();
+        }
     }
 
-    private static async Task<(bool RequestReceived, bool SecretReceived)> ObserveDestination(
-        TcpListener listener, string secret, CancellationToken ct)
+    private static async Task<(bool RequestReceived, bool SecretReceived)> ObserveDestination(TcpListener listener, string secret, CancellationToken ct)
     {
         try
         {
@@ -70,11 +62,13 @@ public sealed class ContextRedirectTests
             var secretReceived = await Serve(listener, "200 OK", "Content-Type: application/json\r\n", body, secret, ct);
             return (true, secretReceived);
         }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested) { return (false, false); }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            return (false, false);
+        }
     }
 
-    private static async Task<bool> Serve(TcpListener listener, string status, string extraHeaders,
-        string body, string secret, CancellationToken ct)
+    private static async Task<bool> Serve(TcpListener listener, string status, string extraHeaders, string body, string secret, CancellationToken ct)
     {
         using var client = await listener.AcceptTcpClientAsync(ct);
         await using var stream = client.GetStream();
@@ -90,9 +84,8 @@ public sealed class ContextRedirectTests
 
             request.Append(Encoding.ASCII.GetString(buffer, 0, count));
         }
-        var sawSecret = request.ToString().Split("\r\n").Any(line =>
-            line.StartsWith("X-Internal-Secret:", StringComparison.OrdinalIgnoreCase) &&
-            line[(line.IndexOf(':') + 1)..].Trim() == secret);
+
+        var sawSecret = request.ToString().Split("\r\n").Any(line => line.StartsWith("X-Internal-Secret:", StringComparison.OrdinalIgnoreCase) && line[(line.IndexOf(':') + 1)..].Trim() == secret);
         var payload = Encoding.UTF8.GetBytes(body);
         var headers = Encoding.ASCII.GetBytes($"HTTP/1.1 {status}\r\n{extraHeaders}Content-Length: {payload.Length}\r\nConnection: close\r\n\r\n");
         await stream.WriteAsync(headers, ct);

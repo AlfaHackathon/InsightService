@@ -2,7 +2,6 @@ using System.Reflection;
 using System.Text.Json;
 using InsightService.Contracts.Analyses;
 using InsightService.Contracts.NewsJobs;
-using InsightService.Models;
 using InsightService.Repositories;
 using InsightService.Services;
 using Microsoft.AspNetCore.Hosting;
@@ -22,6 +21,7 @@ public sealed class PersistenceRegressionTests : IDisposable
         command.CommandText = sql;
         command.ExecuteNonQuery();
     }
+
     private long Count(string table)
     {
         using var connection = Open();
@@ -48,6 +48,7 @@ public sealed class PersistenceRegressionTests : IDisposable
             Execute(connection, "INSERT INTO question_invalidations VALUES('question_legacy','contract','v2')");
             Execute(connection, $"INSERT INTO question_invalidation_times VALUES('question_legacy','contract',{asOf.AddHours(1).UtcTicks})");
         }
+
         for (var reopen = 0; reopen < 3; reopen++)
         {
             database.Migrate();
@@ -70,7 +71,7 @@ public sealed class PersistenceRegressionTests : IDisposable
         var now = DateTimeOffset.UtcNow;
         var firstDraft = new EffectDraft("existing", "contract", null, "first", "unknown", []);
         var initial = new AnalysisRequest(company, null, "news", "v1", now, [firstDraft]);
-        var saved = (await repository.Save(initial, "hash-v1", [new(firstDraft, null)]));
+        var saved = (await (repository.Save(initial, "hash-v1", [new(firstDraft, null)])).RequireContentAsync());
         var newDraft = firstDraft with
         {
             EffectKey = "brand-new"
@@ -84,7 +85,7 @@ public sealed class PersistenceRegressionTests : IDisposable
             NewsVersionId = "v2",
             Drafts = [newDraft, staleDraft]
         };
-        var error = await Assert.ThrowsAsync<ApiException>(async () => await repository.Save(correction, "hash-v2", [new(newDraft, null), new(staleDraft, null)]));
+        var error = await ResultAssert.ErrorAsync(async () => await repository.Save(correction, "hash-v2", [new(newDraft, null), new(staleDraft, null)]));
         Assert.Equal("stale_previous_revision", error.Code);
         var reopened = Effects();
         Assert.Null((await reopened.FindAnalysis(company, "news", "v2")));
@@ -108,7 +109,7 @@ public sealed class PersistenceRegressionTests : IDisposable
         var request = new NewsJobRequest("rollback-job", "news", "v1", DateTimeOffset.UtcNow, JsonSerializer.SerializeToElement(new
         {
         }));
-        await Assert.ThrowsAsync<PostgresException>(async () => await store.Create(request));
+        await Assert.ThrowsAsync<PostgresException>(async () => await (store.Create(request)).RequireContentAsync());
         Assert.Equal(0, Count("news_jobs"));
         Assert.Equal(0, Count("news_job_events"));
         using (var connection = Open())
@@ -116,7 +117,7 @@ public sealed class PersistenceRegressionTests : IDisposable
             Execute(connection, "DROP TRIGGER reject_job_audit ON news_job_events");
         }
 
-        Assert.Equal("queued", (await Jobs().Create(request)).Status);
+        Assert.Equal("queued", (await (Jobs().Create(request)).RequireContentAsync()).Status);
         Assert.Equal(1, Count("news_jobs"));
         Assert.Equal(1, Count("news_job_events"));
     }
@@ -126,24 +127,28 @@ public sealed class PersistenceRegressionTests : IDisposable
     {
         var first = Jobs();
         var second = Jobs();
-        await first.Create(new("race-job", "news", "v1", DateTimeOffset.UtcNow, JsonSerializer.SerializeToElement(new
+        await (first.Create(new("race-job", "news", "v1", DateTimeOffset.UtcNow, JsonSerializer.SerializeToElement(new
         {
-        })));
+        })))).RequireContentAsync();
         using var gate = new ManualResetEventSlim();
-        var attempts = new[] { first, second }.Select((store, i) => Task.Run(async () =>
+        var attempts = new[]
+        {
+            first,
+            second
+        }.Select((store, i) => Task.Run(async () =>
         {
             gate.Wait();
-            return (await store.Claim(new("worker-" + i, "race-job")));
+            return (await (store.Claim(new("worker-" + i, "race-job"))).RequireContentAsync());
         })).ToArray();
         gate.Set();
         var claims = await Task.WhenAll(attempts);
         var winner = Assert.Single(claims, job => job is not null)!;
-        var current = (await Jobs().GetAsync("race-job"));
+        var current = (await (Jobs().GetAsync("race-job")).RequireContentAsync());
         Assert.Equal(winner.WorkerId, current.WorkerId);
         Assert.Equal(1, current.Version);
         var wrongWorker = winner.WorkerId == "worker-0" ? "worker-1" : "worker-0";
-        Assert.Equal("job_lease_conflict", (await Assert.ThrowsAsync<ApiException>(async () => await Jobs().Update("race-job", new(wrongWorker, winner.Version, "completed", winner.Checkpoint)))).Code);
-        Assert.Equal("running", (await Jobs().GetAsync("race-job")).Status);
+        Assert.Equal("job_lease_conflict", (await ResultAssert.ErrorAsync(async () => await Jobs().Update("race-job", new(wrongWorker, winner.Version, "completed", winner.Checkpoint)))).Code);
+        Assert.Equal("running", (await (Jobs().GetAsync("race-job")).RequireContentAsync()).Status);
         Assert.Equal(2, Count("news_job_events"));
     }
 
@@ -162,6 +167,7 @@ public sealed class PersistenceRegressionTests : IDisposable
             Assert.DoesNotContain("{stateTable}", sql);
             Assert.DoesNotContain("{revisionTable}", sql);
         }
+
         var required = type.GetMethod("Required", BindingFlags.Static | BindingFlags.NonPublic)!;
         var error = Assert.Throws<TargetInvocationException>(() => required.Invoke(null, ["AbsentSqlStatement"]));
         Assert.IsType<InvalidOperationException>(error.InnerException);

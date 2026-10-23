@@ -1,4 +1,3 @@
-using AlfaHackaton.Controllers.Controllers;
 using InsightService.Contracts.Analyses;
 using InsightService.Models;
 using InsightService.Services.Interfaces;
@@ -8,7 +7,7 @@ namespace InsightService.Controllers;
 
 [ApiController]
 [Route("insight-service/internal")]
-public sealed class AnalysesController(IAnalysisService service) : BaseController
+public sealed class AnalysesController(IAnalysisService service) : ApiControllerBase
 {
     [HttpPost("analyses")]
     public async Task<IActionResult> Save([FromBody] AnalysisRequest request, CancellationToken ct) => OkOrProblem<AnalysisReceipt>(await service.Save(request, ct));
@@ -19,7 +18,7 @@ public sealed class AnalysesController(IAnalysisService service) : BaseControlle
     {
         if ((triggerMaterialId is null) != (triggerVersionId is null))
         {
-            throw new ApiException(400, "invalid_trigger", "Both trigger identifiers are required.");
+            return OkOrProblem<AnalysisReceipt>(new(new ApiError(400, "invalid_trigger", "Both trigger identifiers are required.")));
         }
 
         return OkOrProblem<AnalysisReceipt>(await service.GetAnalysis(companyId, newsMaterialId, newsVersionId,

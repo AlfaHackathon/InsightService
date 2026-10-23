@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
+using AlfaHackaton.Result;
 using InsightService.Contracts.Calculations;
 using InsightService.Models;
 
@@ -9,48 +10,60 @@ public static partial class DecimalCalculator
 {
     [GeneratedRegex(@"^-?(0|[1-9][0-9]*)(\.[0-9]+)?$", RegexOptions.CultureInvariant)]
     private static partial Regex DecimalLiteral();
-
-    public static (Calculation Calculation, string Result) Calculate(Calculation input)
+    public static Result<(Calculation Calculation, string Result)> Calculate(Calculation input)
     {
-        if (string.IsNullOrWhiteSpace(input.Unit) || input.Unit.Length > 100 ||
-            string.IsNullOrWhiteSpace(input.Period) || input.Period.Length > 1000 || input.Expression is null)
+        if (string.IsNullOrWhiteSpace(input.Unit) ||
+            input.Unit.Length > 100 ||
+            string.IsNullOrWhiteSpace(input.Period) ||
+            input.Period.Length > 1000 ||
+            input.Expression is null)
         {
-            throw new ApiException(422, "invalid_calculation", "A bounded unit, period and expression are required.");
+            return new(new ApiError(422, "invalid_calculation", "A bounded unit, period and expression are required."));
         }
 
         var count = 0;
         try
         {
-            var (expression, value) = Evaluate(input.Expression, 1, ref count);
-            return (input with
+            var expressionEvaluation = Evaluate(input.Expression, 1, ref count);
+            if (expressionEvaluation.Error is { } expressionEvaluationError)
+            {
+                return new(expressionEvaluationError);
+            }
+
+            var (expression, value) = expressionEvaluation.Content!;
+            return new((input with
             {
                 Expression = expression
-            }, Format(value));
+            }, Format(value)), null);
         }
         catch (OverflowException)
         {
-            throw new ApiException(422, "decimal_overflow", "The expression exceeds Decimal precision or range.");
+            return new(new ApiError(422, "decimal_overflow", "The expression exceeds Decimal precision or range."));
         }
         catch (DivideByZeroException)
         {
-            throw new ApiException(422, "division_by_zero", "The expression divides by zero.");
+            return new(new ApiError(422, "division_by_zero", "The expression divides by zero."));
         }
     }
 
-    private static (ExpressionNode, decimal) Evaluate(ExpressionNode node, int depth, ref int count)
+    private static Result<(ExpressionNode, decimal)> Evaluate(ExpressionNode node, int depth, ref int count)
     {
-        if (depth > 16 || ++count > 255)
+        if (depth > 16 ||
+            ++count > 255)
         {
-            throw new ApiException(422, "expression_budget", "Expressions are limited to depth 16 and 255 nodes.");
+            return new(new ApiError(422, "expression_budget", "Expressions are limited to depth 16 and 255 nodes."));
         }
 
         if (node.Kind == "value")
         {
-            if (node.Value is null || node.Value.Length > 100 || node.Left is not null || node.Right is not null ||
-                !DecimalLiteral().IsMatch(node.Value) || !decimal.TryParse(node.Value,
-                    NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var value))
+            if (node.Value is null ||
+                node.Value.Length > 100 ||
+                node.Left is not null ||
+                node.Right is not null ||
+                !DecimalLiteral().IsMatch(node.Value) ||
+                !decimal.TryParse(node.Value, NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var value))
             {
-                throw new ApiException(422, "invalid_decimal", "value must be a finite invariant Decimal string with no child expressions.");
+                return new(new ApiError(422, "invalid_decimal", "value must be a finite invariant Decimal string with no child expressions."));
             }
 
             var normalizedInput = node.Value.Contains('.') ? node.Value.TrimEnd('0').TrimEnd('.') : node.Value;
@@ -61,19 +74,34 @@ public static partial class DecimalCalculator
 
             if (Format(value) != normalizedInput)
             {
-                throw new ApiException(422, "decimal_precision", "The literal cannot be represented exactly by Decimal.");
+                return new(new ApiError(422, "decimal_precision", "The literal cannot be represented exactly by Decimal."));
             }
 
-            return (new ExpressionNode("value", Format(value)), value);
-        }
-        if (node.Kind is not ("add" or "subtract" or "multiply" or "divide" or "min" or "max") ||
-            node.Value is not null || node.Left is null || node.Right is null)
-        {
-            throw new ApiException(422, "invalid_expression", "An operator requires exactly left and right expressions.");
+            return new((new ExpressionNode("value", Format(value)), value), null);
         }
 
-        var (leftNode, left) = Evaluate(node.Left, depth + 1, ref count);
-        var (rightNode, right) = Evaluate(node.Right, depth + 1, ref count);
+        if (node.Kind is not ("add" or "subtract" or "multiply" or "divide" or "min" or "max") ||
+            node.Value is not null ||
+            node.Left is null ||
+            node.Right is null)
+        {
+            return new(new ApiError(422, "invalid_expression", "An operator requires exactly left and right expressions."));
+        }
+
+        var leftEvaluation = Evaluate(node.Left, depth + 1, ref count);
+        if (leftEvaluation.Error is { } leftEvaluationError)
+        {
+            return new(leftEvaluationError);
+        }
+
+        var (leftNode, left) = leftEvaluation.Content!;
+        var rightEvaluation = Evaluate(node.Right, depth + 1, ref count);
+        if (rightEvaluation.Error is { } rightEvaluationError)
+        {
+            return new(rightEvaluationError);
+        }
+
+        var (rightNode, right) = rightEvaluation.Content!;
         var result = node.Kind switch
         {
             "add" => checked(left + right),
@@ -84,7 +112,7 @@ public static partial class DecimalCalculator
             "max" => Math.Max(left, right),
             _ => throw new InvalidOperationException()
         };
-        return (new ExpressionNode(node.Kind, Left: leftNode, Right: rightNode), result);
+        return new((new ExpressionNode(node.Kind, Left: leftNode, Right: rightNode), result), null);
     }
 
     private static string Format(decimal value) => value.ToString("0.############################", CultureInfo.InvariantCulture);
