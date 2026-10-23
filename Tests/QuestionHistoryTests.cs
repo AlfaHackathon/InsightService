@@ -350,7 +350,7 @@ public sealed class QuestionHistoryTests : IDisposable
 
             ]
         };
-        Assert.Equal("invalid_question_identity", (await ResultAssert.ErrorAsync(async () => await Service().Save(invalid))).Code);
+        Assert.Equal("A stable mechanism, frame, unit, target period and comparison baseline for budget deltas are required.", (await ResultAssert.ErrorAsync(async () => await Service().Save(invalid))).Title);
     }
 
     [Fact]
@@ -364,7 +364,7 @@ public sealed class QuestionHistoryTests : IDisposable
             ExpectedStateVersion = snapshot.StateVersion
         };
         var error = await ResultAssert.ErrorAsync(async () => await Service().Save(stale));
-        Assert.Equal("stale_company_snapshot", error.Code);
+        Assert.Equal("The immutable company snapshot changed before atomic commit.", error.Title);
         Assert.Single((await (Service().GetSnapshot(company, "news-b")).RequireContentAsync()).Effects);
         await ResultAssert.ErrorAsync(async () => await Service().GetAnalysis(company, "news-b", "v1"));
     }

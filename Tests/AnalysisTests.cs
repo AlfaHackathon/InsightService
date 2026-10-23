@@ -5,7 +5,6 @@ using AlfaHackaton.Result;
 using InsightService.Contracts.Analyses;
 using InsightService.Contracts.Calculations;
 using InsightService.Contracts.Context;
-using InsightService.Models;
 using InsightService.Models.Persistence;
 using InsightService.Repositories;
 using InsightService.Services;
@@ -51,7 +50,7 @@ public sealed class AnalysisTests : IDisposable
         Assert.Empty(first.Effects);
         Assert.Equal(first.AnalysisId, (await (Service().GetAnalysis(company, "news", "v1")).RequireContentAsync()).AnalysisId);
         Assert.True((await (Service().Save(empty)).RequireContentAsync()).Duplicate);
-        Assert.Equal(409, (await ResultAssert.ErrorAsync(async () => await Service().Save(Request()))).StatusCode);
+        Assert.Equal(409, (int)(await ResultAssert.ErrorAsync(async () => await Service().Save(Request()))).HttpStatusCode!);
     }
 
     [Fact]
@@ -124,9 +123,9 @@ public sealed class AnalysisTests : IDisposable
 
             ]
         };
-        Assert.Equal(409, (await ResultAssert.ErrorAsync(async () => await Service().Save(wrongObject))).StatusCode);
+        Assert.Equal(409, (int)(await ResultAssert.ErrorAsync(async () => await Service().Save(wrongObject))).HttpStatusCode!);
         await (Service().Save(Request("v2", prior, "60"))).RequireContentAsync();
-        Assert.Equal(409, (await ResultAssert.ErrorAsync(async () => await Service().Save(Request("v3", prior, "40")))).StatusCode);
+        Assert.Equal(409, (int)(await ResultAssert.ErrorAsync(async () => await Service().Save(Request("v3", prior, "40")))).HttpStatusCode!);
         Assert.Equal(2, (await (Service().GetEffect(first.Effects.Single().EffectId)).RequireContentAsync()).History.Count);
     }
 
@@ -153,7 +152,7 @@ public sealed class AnalysisTests : IDisposable
 
                 ]
             };
-            Assert.Equal(422, (await ResultAssert.ErrorAsync(async () => await Service().Save(bad))).StatusCode);
+            Assert.Equal(422, (int)(await ResultAssert.ErrorAsync(async () => await Service().Save(bad))).HttpStatusCode!);
             Assert.Empty((await (Service().GetEffects(company, "news")).RequireContentAsync()));
         }
     }
@@ -203,8 +202,8 @@ public sealed class AnalysisTests : IDisposable
         if (conflictingPayload)
         {
             var failure = await ResultAssert.ErrorAsync(() => pending.WaitAsync(TimeSpan.FromSeconds(5)));
-            Assert.Equal(409, failure.StatusCode);
-            Assert.Equal("analysis_payload_conflict", failure.Code);
+            Assert.Equal(409, (int)failure.HttpStatusCode!);
+            Assert.Equal("This completed news analysis has a different payload.", failure.Title);
         }
         else
         {
@@ -231,7 +230,7 @@ public sealed class AnalysisTests : IDisposable
             ]
         };
         var prepared = invalid.Drafts.Select(x => new PreparedDraft(x, "15600")).ToArray();
-        Assert.Equal(409, (await ResultAssert.ErrorAsync(async () => await Repository().Save(invalid, "request-hash", prepared))).StatusCode);
+        Assert.Equal(409, (int)(await ResultAssert.ErrorAsync(async () => await Repository().Save(invalid, "request-hash", prepared))).HttpStatusCode!);
         Assert.Empty((await Repository().GetEffects(company, "news")));
         Assert.Null(await Repository().FindAnalysis(company, "news", "v1"));
     }
@@ -259,7 +258,7 @@ public sealed class AnalysisTests : IDisposable
         {
             if (materialId == "missing")
             {
-                return new(new ApiError(422, "unknown_source", "missing"));
+                return new(new AlfaHackaton.Result.Errors.Error("missing") { HttpStatusCode = System.Net.HttpStatusCode.UnprocessableEntity });
             }
 
             var material = new MaterialVersion(materialId, versionId, "source", materialId == "news" ? "news" : "company", "Synthetic", "Synthetic source", materialId == "future" ? now.AddDays(1) : now, now, materialId == "news" && versionId != "v1" ? versionId == "v2" ? "v1" : "v2" : null, materialId == "news" ? [] : [materialId == "foreign" ? Guid.NewGuid() : company], [], Hash);

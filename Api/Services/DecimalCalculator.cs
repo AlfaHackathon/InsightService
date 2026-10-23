@@ -1,8 +1,9 @@
 using System.Globalization;
+using System.Net;
 using System.Text.RegularExpressions;
 using AlfaHackaton.Result;
+using AlfaHackaton.Result.Errors;
 using InsightService.Contracts.Calculations;
-using InsightService.Models;
 
 namespace InsightService.Services;
 
@@ -18,7 +19,7 @@ public static partial class DecimalCalculator
             input.Period.Length > 1000 ||
             input.Expression is null)
         {
-            return new(new ApiError(422, "invalid_calculation", "A bounded unit, period and expression are required."));
+            return new(new Error("A bounded unit, period and expression are required.", ErrorSource.Client, ErrorType.CorruptedInfo) { HttpStatusCode = HttpStatusCode.UnprocessableEntity });
         }
 
         var count = 0;
@@ -38,11 +39,11 @@ public static partial class DecimalCalculator
         }
         catch (OverflowException)
         {
-            return new(new ApiError(422, "decimal_overflow", "The expression exceeds Decimal precision or range."));
+            return new(new Error("The expression exceeds Decimal precision or range.", ErrorSource.Client, ErrorType.CorruptedInfo) { HttpStatusCode = HttpStatusCode.UnprocessableEntity });
         }
         catch (DivideByZeroException)
         {
-            return new(new ApiError(422, "division_by_zero", "The expression divides by zero."));
+            return new(new Error("The expression divides by zero.", ErrorSource.Client, ErrorType.CorruptedInfo) { HttpStatusCode = HttpStatusCode.UnprocessableEntity });
         }
     }
 
@@ -51,7 +52,7 @@ public static partial class DecimalCalculator
         if (depth > 16 ||
             ++count > 255)
         {
-            return new(new ApiError(422, "expression_budget", "Expressions are limited to depth 16 and 255 nodes."));
+            return new(new Error("Expressions are limited to depth 16 and 255 nodes.", ErrorSource.Client, ErrorType.CorruptedInfo) { HttpStatusCode = HttpStatusCode.UnprocessableEntity });
         }
 
         if (node.Kind == "value")
@@ -63,7 +64,7 @@ public static partial class DecimalCalculator
                 !DecimalLiteral().IsMatch(node.Value) ||
                 !decimal.TryParse(node.Value, NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var value))
             {
-                return new(new ApiError(422, "invalid_decimal", "value must be a finite invariant Decimal string with no child expressions."));
+                return new(new Error("value must be a finite invariant Decimal string with no child expressions.", ErrorSource.Client, ErrorType.CorruptedInfo) { HttpStatusCode = HttpStatusCode.UnprocessableEntity });
             }
 
             var normalizedInput = node.Value.Contains('.') ? node.Value.TrimEnd('0').TrimEnd('.') : node.Value;
@@ -74,7 +75,7 @@ public static partial class DecimalCalculator
 
             if (Format(value) != normalizedInput)
             {
-                return new(new ApiError(422, "decimal_precision", "The literal cannot be represented exactly by Decimal."));
+                return new(new Error("The literal cannot be represented exactly by Decimal.", ErrorSource.Client, ErrorType.CorruptedInfo) { HttpStatusCode = HttpStatusCode.UnprocessableEntity });
             }
 
             return new((new ExpressionNode("value", Format(value)), value), null);
@@ -85,7 +86,7 @@ public static partial class DecimalCalculator
             node.Left is null ||
             node.Right is null)
         {
-            return new(new ApiError(422, "invalid_expression", "An operator requires exactly left and right expressions."));
+            return new(new Error("An operator requires exactly left and right expressions.", ErrorSource.Client, ErrorType.CorruptedInfo) { HttpStatusCode = HttpStatusCode.UnprocessableEntity });
         }
 
         var leftEvaluation = Evaluate(node.Left, depth + 1, ref count);

@@ -1,8 +1,10 @@
+using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using AlfaHackaton.Result;
+using AlfaHackaton.Result.Errors;
 using InsightService.Contracts.Analyses;
 using InsightService.Contracts.Questions;
 using static InsightService.Common.AnalysisProtocol;
@@ -48,7 +50,7 @@ internal static class QuestionIdentityPolicy
             question.Frame == "budget_delta" &&
             question.BaselinePeriod is null)
         {
-            return new(new ApiError(400, "invalid_question_identity", "A stable mechanism, frame, unit, target period and comparison baseline for budget deltas are required."));
+            return new(new Error("A stable mechanism, frame, unit, target period and comparison baseline for budget deltas are required.", ErrorSource.Client, ErrorType.CorruptedInfo) { HttpStatusCode = HttpStatusCode.BadRequest });
         }
 
         var key = string.Join('\u001f', literal, question.Mechanism, question.Frame, question.Unit, question.TargetPeriod, question.BaselinePeriod ?? "", question.Basis ?? "unknown");

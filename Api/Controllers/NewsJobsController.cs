@@ -1,4 +1,5 @@
 using System.Text.Json;
+using AlfaHackaton.Controllers.Controllers;
 using InsightService.Common;
 using InsightService.Contracts.NewsJobs;
 using InsightService.Repositories.Interfaces;
@@ -7,7 +8,7 @@ namespace InsightService.Controllers;
 
 [ApiController]
 [Route("insight-service/internal")]
-public sealed class NewsJobsController(INewsJobRepository store) : ApiControllerBase
+public sealed class NewsJobsController(INewsJobRepository store) : BaseController
 {
     [HttpPost("news-jobs")]
     public async Task<IActionResult> Create([FromBody] NewsJobRequest request) => OkOrProblem<NewsJob>(await store.Create(request));

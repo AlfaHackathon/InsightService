@@ -1,8 +1,8 @@
 using System.Net;
 using AlfaHackaton.HttpClient.Common.Interfaces;
 using AlfaHackaton.Result;
+using AlfaHackaton.Result.Errors;
 using InsightService.Contracts.Context;
-using InsightService.Models;
 using InsightService.Services.Interfaces;
 using InsightService.Settings;
 
@@ -18,7 +18,7 @@ public sealed class ContextSourceResolver(IHttpClient<ContextHttpSettings> clien
             uri.Scheme is not ("http" or "https") ||
             string.IsNullOrEmpty(secret))
         {
-            return new(new ApiError(503, "context_not_configured", "ContextService URL and internal credential must be configured."));
+            return new(new Error("ContextService URL and internal credential must be configured.", ErrorSource.External, ErrorType.Undefined) { HttpStatusCode = HttpStatusCode.ServiceUnavailable });
         }
 
         var url = uri.ToString().TrimEnd('/') + "/context-service/internal/material-versions/" + Uri.EscapeDataString(materialId) + "/" + Uri.EscapeDataString(versionId);
@@ -27,18 +27,18 @@ public sealed class ContextSourceResolver(IHttpClient<ContextHttpSettings> clien
             var response = await client.Get<MaterialVersion>(url, (headers, _) => headers.Add("X-Internal-Secret", secret), cancellationToken);
             if (response.Status == HttpStatusCode.NotFound)
             {
-                return new(new ApiError(422, "unknown_source", "A referenced material version does not exist."));
+                return new(new Error("A referenced material version does not exist.", ErrorSource.Client, ErrorType.CorruptedInfo) { HttpStatusCode = HttpStatusCode.UnprocessableEntity });
             }
 
             if (!response.IsSuccessStatusCode)
             {
-                return new(new ApiError(502, "context_rejected", "ContextService rejected source resolution; no effect was saved."));
+                return new(new Error("ContextService rejected source resolution; no effect was saved.", ErrorSource.External, ErrorType.Undefined) { HttpStatusCode = HttpStatusCode.BadGateway });
             }
 
             var value = response.Result;
             if (value is null)
             {
-                return new(new ApiError(502, "invalid_context_response", "ContextService returned no material."));
+                return new(new Error("ContextService returned no material.", ErrorSource.External, ErrorType.Undefined) { HttpStatusCode = HttpStatusCode.BadGateway });
             }
 
             var material = value;
@@ -50,22 +50,22 @@ public sealed class ContextSourceResolver(IHttpClient<ContextHttpSettings> clien
                 material.ContentHash.Length != 64 ||
                 !material.ContentHash.All(Uri.IsHexDigit))
             {
-                return new(new ApiError(502, "invalid_context_response", "ContextService returned an invalid material payload."));
+                return new(new Error("ContextService returned an invalid material payload.", ErrorSource.External, ErrorType.Undefined) { HttpStatusCode = HttpStatusCode.BadGateway });
             }
 
             return new(material, null);
         }
         catch (HttpRequestException)
         {
-            return new(new ApiError(503, "context_unavailable", "ContextService could not be reached; no effect was saved."));
+            return new(new Error("ContextService could not be reached; no effect was saved.", ErrorSource.External, ErrorType.Undefined) { HttpStatusCode = HttpStatusCode.ServiceUnavailable });
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            return new(new ApiError(503, "context_timeout", "ContextService timed out; no effect was saved."));
+            return new(new Error("ContextService timed out; no effect was saved.", ErrorSource.External, ErrorType.Undefined) { HttpStatusCode = HttpStatusCode.ServiceUnavailable });
         }
         catch (Newtonsoft.Json.JsonException)
         {
-            return new(new ApiError(502, "invalid_context_response", "ContextService returned an invalid material response."));
+            return new(new Error("ContextService returned an invalid material response.", ErrorSource.External, ErrorType.Undefined) { HttpStatusCode = HttpStatusCode.BadGateway });
         }
     }
 }

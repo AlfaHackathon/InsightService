@@ -86,7 +86,7 @@ public sealed class PersistenceRegressionTests : IDisposable
             Drafts = [newDraft, staleDraft]
         };
         var error = await ResultAssert.ErrorAsync(async () => await repository.Save(correction, "hash-v2", [new(newDraft, null), new(staleDraft, null)]));
-        Assert.Equal("stale_previous_revision", error.Code);
+        Assert.Equal("The effect changed before this transaction; no batch result was saved.", error.Title);
         var reopened = Effects();
         Assert.Null((await reopened.FindAnalysis(company, "news", "v2")));
         var effect = Assert.Single((await reopened.GetSnapshot(company, "news")).Effects);
@@ -147,7 +147,7 @@ public sealed class PersistenceRegressionTests : IDisposable
         Assert.Equal(winner.WorkerId, current.WorkerId);
         Assert.Equal(1, current.Version);
         var wrongWorker = winner.WorkerId == "worker-0" ? "worker-1" : "worker-0";
-        Assert.Equal("job_lease_conflict", (await ResultAssert.ErrorAsync(async () => await Jobs().Update("race-job", new(wrongWorker, winner.Version, "completed", winner.Checkpoint)))).Code);
+        Assert.Equal("This worker no longer owns the current job lease/version.", (await ResultAssert.ErrorAsync(async () => await Jobs().Update("race-job", new(wrongWorker, winner.Version, "completed", winner.Checkpoint)))).Title);
         Assert.Equal("running", (await (Jobs().GetAsync("race-job")).RequireContentAsync()).Status);
         Assert.Equal(2, Count("news_job_events"));
     }

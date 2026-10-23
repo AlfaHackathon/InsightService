@@ -1,11 +1,12 @@
+using System.Net;
 using System.Text.Json;
 using AlfaHackaton.DapperContext.Common.Interfaces.Dapper;
 using AlfaHackaton.DapperContext.Dapper;
 using AlfaHackaton.Result;
+using AlfaHackaton.Result.Errors;
 using InsightService.Common;
 using InsightService.Contracts.Analyses;
 using InsightService.Contracts.SourceReactions;
-using InsightService.Models;
 using InsightService.Repositories.Postgres;
 using InsightService.Resources;
 
@@ -29,7 +30,7 @@ internal sealed class SourceReactionRepository(IDapperContext context)
             change.CompanyIds.Length > 512 ||
             change.Category is not ("material:company" or "material:market" or "group" or "role" or "company"))
         {
-            return new(new ApiError(400, "invalid_source_change", "A bounded source or projection change is required."));
+            return new(new Error("A bounded source or projection change is required.", ErrorSource.Client, ErrorType.CorruptedInfo) { HttpStatusCode = HttpStatusCode.BadRequest });
         }
 
         var projection = !change.Category.StartsWith("material:", StringComparison.Ordinal);

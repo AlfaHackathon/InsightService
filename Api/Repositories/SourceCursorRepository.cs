@@ -1,10 +1,11 @@
+using System.Net;
 using System.Text.Json;
 using AlfaHackaton.DapperContext.Common.Interfaces.Dapper;
 using AlfaHackaton.DapperContext.Dapper;
 using AlfaHackaton.Result;
+using AlfaHackaton.Result.Errors;
 using InsightService.Common;
 using InsightService.Contracts.NewsJobs;
-using InsightService.Models;
 using InsightService.Repositories.Postgres;
 using InsightService.Resources;
 
@@ -24,14 +25,14 @@ internal sealed class SourceCursorRepository(IDapperContext context)
         if (cursor.Sequence < 0 ||
             cursor.AfterQuestion?.Length > 200)
         {
-            return new(new ApiError(400, "invalid_source_cursor", "A bounded source cursor is required."));
+            return new(new Error("A bounded source cursor is required.", ErrorSource.Client, ErrorType.CorruptedInfo) { HttpStatusCode = HttpStatusCode.BadRequest });
         }
 
         using var transaction = await InsightTransaction.OpenAsync(context);
         var version = await transaction.FirstOrDefault<long?>(new QueryObject(InsightSql.ReadSourceCursorVersion)) ?? 0;
         if (version != cursor.Version)
         {
-            return new(new ApiError(409, "source_cursor_conflict", "Another consumer advanced the source cursor."));
+            return new(new Error("Another consumer advanced the source cursor.", ErrorSource.Client, ErrorType.CorruptedInfo) { HttpStatusCode = HttpStatusCode.Conflict });
         }
 
         var next = cursor with

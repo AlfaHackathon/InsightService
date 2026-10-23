@@ -1,10 +1,11 @@
+using System.Net;
 using System.Text.Json;
 using AlfaHackaton.DapperContext.Common.Interfaces.Dapper;
 using AlfaHackaton.DapperContext.Dapper;
 using AlfaHackaton.Result;
+using AlfaHackaton.Result.Errors;
 using InsightService.Common;
 using InsightService.Contracts.Analyses;
-using InsightService.Models;
 using InsightService.Models.Persistence;
 using InsightService.Models.Policies;
 using InsightService.Resources;
@@ -87,7 +88,7 @@ internal static class EffectRevisionWriter
         {
             if (current.CurrentRevision.Question is not { } oldQuestion)
             {
-                return new(new ApiError(409, "effect_identity_conflict", "The previous question does not normalize to the requested identity."));
+                return new(new Error("The previous question does not normalize to the requested identity.", ErrorSource.Client, ErrorType.CorruptedInfo) { HttpStatusCode = HttpStatusCode.Conflict });
             }
             var historicalKey = QuestionIdentityPolicy.QuestionKey(current.LiteralObjectRef, oldQuestion);
             if (historicalKey.Error is { } identityError)
@@ -96,7 +97,7 @@ internal static class EffectRevisionWriter
             }
             if (historicalKey.Content != draft.EffectKey)
             {
-                return new(new ApiError(409, "effect_identity_conflict", "The previous question does not normalize to the requested identity."));
+                return new(new Error("The previous question does not normalize to the requested identity.", ErrorSource.Client, ErrorType.CorruptedInfo) { HttpStatusCode = HttpStatusCode.Conflict });
             }
 
             await transaction.Command(new QueryObject(InsightSql.RekeyQuestion, new
@@ -110,13 +111,13 @@ internal static class EffectRevisionWriter
         {
             if (draft.ExpectedPreviousRevisionId != current.CurrentRevision.RevisionId)
             {
-                return new(new ApiError(409, "stale_previous_revision", "The effect changed before this transaction; no batch result was saved."));
+                return new(new Error("The effect changed before this transaction; no batch result was saved.", ErrorSource.Client, ErrorType.CorruptedInfo) { HttpStatusCode = HttpStatusCode.Conflict });
             }
 
             if (current.LiteralObjectRef != draft.LiteralObjectRef ||
                 current.BankProfileId != request.BankProfileId)
             {
-                return new(new ApiError(409, "effect_identity_conflict", "The literal object or bank-profile bridge conflicts with the stored effect."));
+                return new(new Error("The literal object or bank-profile bridge conflicts with the stored effect.", ErrorSource.Client, ErrorType.CorruptedInfo) { HttpStatusCode = HttpStatusCode.Conflict });
             }
 
             return new();
@@ -124,7 +125,7 @@ internal static class EffectRevisionWriter
 
         if (draft.ExpectedPreviousRevisionId is not null)
         {
-            return new(new ApiError(409, "missing_previous_effect", "A new effect cannot reference a missing previous revision."));
+            return new(new Error("A new effect cannot reference a missing previous revision.", ErrorSource.Client, ErrorType.CorruptedInfo) { HttpStatusCode = HttpStatusCode.Conflict });
         }
 
         await transaction.Command(new QueryObject(canonical ? InsightSql.InsertQuestion : InsightSql.InsertEffect,
@@ -161,7 +162,7 @@ internal static class EffectRevisionWriter
             }));
         if (changed != 1)
         {
-            return new(new ApiError(409, "stale_previous_revision", "The effect changed before this update; no batch result was saved."));
+            return new(new Error("The effect changed before this update; no batch result was saved.", ErrorSource.Client, ErrorType.CorruptedInfo) { HttpStatusCode = HttpStatusCode.Conflict });
         }
 
         return new();

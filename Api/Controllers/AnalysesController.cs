@@ -1,5 +1,7 @@
+using System.Net;
+using AlfaHackaton.Controllers.Controllers;
+using AlfaHackaton.Result.Errors;
 using InsightService.Contracts.Analyses;
-using InsightService.Models;
 using InsightService.Services.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
@@ -7,7 +9,7 @@ namespace InsightService.Controllers;
 
 [ApiController]
 [Route("insight-service/internal")]
-public sealed class AnalysesController(IAnalysisService service) : ApiControllerBase
+public sealed class AnalysesController(IAnalysisService service) : BaseController
 {
     [HttpPost("analyses")]
     public async Task<IActionResult> Save([FromBody] AnalysisRequest request, CancellationToken ct) => OkOrProblem<AnalysisReceipt>(await service.Save(request, ct));
@@ -18,7 +20,7 @@ public sealed class AnalysesController(IAnalysisService service) : ApiController
     {
         if ((triggerMaterialId is null) != (triggerVersionId is null))
         {
-            return OkOrProblem<AnalysisReceipt>(new(new ApiError(400, "invalid_trigger", "Both trigger identifiers are required.")));
+            return OkOrProblem<AnalysisReceipt>(new(new Error("Both trigger identifiers are required.", ErrorSource.Client, ErrorType.CorruptedInfo) { HttpStatusCode = HttpStatusCode.BadRequest }));
         }
 
         return OkOrProblem<AnalysisReceipt>(await service.GetAnalysis(companyId, newsMaterialId, newsVersionId,

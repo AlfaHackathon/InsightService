@@ -1,5 +1,5 @@
 using AlfaHackaton.Result;
-using InsightService.Models;
+using AlfaHackaton.Result.Errors;
 using Xunit;
 
 internal static class ResultAssert
@@ -10,6 +10,6 @@ internal static class ResultAssert
         return result.Content!;
     }
     public static async Task<T> RequireContentAsync<T>(this Task<Result<T>> task) => (await task).RequireContent();
-    public static async Task<ApiError> ErrorAsync<T>(Func<Task<Result<T>>> action) => Assert.IsType<ApiError>((await action()).Error);
-    public static ApiError Error<T>(Func<Result<T>> action) => Assert.IsType<ApiError>(action().Error);
+    public static async Task<Error> ErrorAsync<T>(Func<Task<Result<T>>> action) => Assert.IsType<Error>((await action()).Error);
+    public static Error Error<T>(Func<Result<T>> action) => Assert.IsType<Error>(action().Error);
 }

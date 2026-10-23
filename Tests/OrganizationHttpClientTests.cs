@@ -39,17 +39,17 @@ public sealed class OrganizationHttpClientTests
     }
 
     [Theory]
-    [InlineData(404, 422, "unknown_source")]
-    [InlineData(403, 502, "context_rejected")]
-    [InlineData(302, 502, "context_rejected")]
-    [InlineData(503, 502, "context_rejected")]
-    public async Task OrganizationClientPreservesUpstreamStatusMapping(int status, int expected, string code)
+    [InlineData(404, 422, "A referenced material version does not exist.")]
+    [InlineData(403, 502, "ContextService rejected source resolution; no effect was saved.")]
+    [InlineData(302, 502, "ContextService rejected source resolution; no effect was saved.")]
+    [InlineData(503, 502, "ContextService rejected source resolution; no effect was saved.")]
+    public async Task OrganizationClientPreservesUpstreamStatusMapping(int status, int expected, string message)
     {
         using var transport = new System.Net.Http.HttpClient(new Handler((_, _) => Task.FromResult(new HttpResponseMessage((HttpStatusCode)status) { Content = new StringContent("{\"upstream\":\"failure\"}") })));
         var resolver = new ContextSourceResolver(new HttpClient<ContextHttpSettings>(transport, new()), Configuration());
         var error = await ResultAssert.ErrorAsync(() => resolver.GetAsync("news", "v1", CancellationToken.None));
-        Assert.Equal(expected, error.StatusCode);
-        Assert.Equal(code, error.Code);
+        Assert.Equal(expected, (int)error.HttpStatusCode!);
+        Assert.Equal(message, error.Title);
     }
 
     [Fact]
@@ -64,10 +64,10 @@ public sealed class OrganizationHttpClientTests
             Timeout = TimeSpan.FromMilliseconds(30)
         };
         var resolver = new ContextSourceResolver(new HttpClient<ContextHttpSettings>(slow, new()), Configuration());
-        Assert.Equal("context_timeout", (await ResultAssert.ErrorAsync(() => resolver.GetAsync("news", "v1", CancellationToken.None))).Code);
+        Assert.Equal("ContextService timed out; no effect was saved.", (await ResultAssert.ErrorAsync(() => resolver.GetAsync("news", "v1", CancellationToken.None))).Title);
         using var invalid = new System.Net.Http.HttpClient(new Handler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{") })));
         resolver = new(new HttpClient<ContextHttpSettings>(invalid, new()), Configuration());
-        Assert.Equal("invalid_context_response", (await ResultAssert.ErrorAsync(() => resolver.GetAsync("news", "v1", CancellationToken.None))).Code);
+        Assert.Equal("ContextService returned an invalid material response.", (await ResultAssert.ErrorAsync(() => resolver.GetAsync("news", "v1", CancellationToken.None))).Title);
     }
 
     private sealed class Handler(Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> send) : HttpMessageHandler

@@ -1,7 +1,8 @@
+using System.Net;
 using AlfaHackaton.Result;
+using AlfaHackaton.Result.Errors;
 using InsightService.Contracts.Analyses;
 using InsightService.Contracts.Calculations;
-using InsightService.Models;
 using InsightService.Models.Persistence;
 using InsightService.Models.Policies;
 using static InsightService.Services.AnalysisService;
@@ -14,7 +15,7 @@ internal static class AnalysisRequestNormalizer
     {
         if (r.CompanyId == Guid.Empty)
         {
-            return new(new ApiError(400, "invalid_company", "companyId must be a nonempty application Guid."));
+            return new(new Error("companyId must be a nonempty application Guid.", ErrorSource.Client, ErrorType.CorruptedInfo) { HttpStatusCode = HttpStatusCode.BadRequest });
         }
 
         if (RequireId(r.NewsMaterialId, "newsMaterialId").Error is { } newsMaterialIdError)
@@ -41,7 +42,7 @@ internal static class AnalysisRequestNormalizer
         {
             if (r.Mechanisms.Length is < 1 or > 12)
             {
-                return new(new ApiError(400, "invalid_mechanism_scope", "Use 1-12 explicit mechanisms or omit the scope."));
+                return new(new Error("Use 1-12 explicit mechanisms or omit the scope.", ErrorSource.Client, ErrorType.CorruptedInfo) { HttpStatusCode = HttpStatusCode.BadRequest });
             }
 
             foreach (var mechanism in r.Mechanisms)
@@ -63,7 +64,7 @@ internal static class AnalysisRequestNormalizer
             r.Drafts is null ||
             r.Drafts.Length > 32)
         {
-            return new(new ApiError(400, "invalid_request", "asOf and a drafts array of at most 32 entries are required."));
+            return new(new Error("asOf and a drafts array of at most 32 entries are required.", ErrorSource.Client, ErrorType.CorruptedInfo) { HttpStatusCode = HttpStatusCode.BadRequest });
         }
 
         if (r.BankProfileId is not null)
@@ -80,7 +81,7 @@ internal static class AnalysisRequestNormalizer
         {
             if (draft is null)
             {
-                return new(new ApiError(400, "invalid_draft", "drafts cannot contain null."));
+                return new(new Error("drafts cannot contain null.", ErrorSource.Client, ErrorType.CorruptedInfo) { HttpStatusCode = HttpStatusCode.BadRequest });
             }
 
             if (string.IsNullOrWhiteSpace(draft.EffectKey) ||
@@ -88,7 +89,7 @@ internal static class AnalysisRequestNormalizer
                 draft.EffectKey != draft.EffectKey.Trim() ||
                 draft.EffectKey.Any(char.IsControl))
             {
-                return new(new ApiError(400, "invalid_effect_key", "effectKey must be a nonempty bounded stable identifier."));
+                return new(new Error("effectKey must be a nonempty bounded stable identifier.", ErrorSource.Client, ErrorType.CorruptedInfo) { HttpStatusCode = HttpStatusCode.BadRequest });
             }
 
             var question = draft.Question is null ? null : normalizeQuestions ? NormalizeQuestion(draft.Question) : draft.Question;
@@ -105,7 +106,7 @@ internal static class AnalysisRequestNormalizer
 
             if (!keys.Add(stableKey))
             {
-                return new(new ApiError(400, "duplicate_effect_key", "An analysis cannot contain the same business question twice."));
+                return new(new Error("An analysis cannot contain the same business question twice.", ErrorSource.Client, ErrorType.CorruptedInfo) { HttpStatusCode = HttpStatusCode.BadRequest });
             }
 
             if (string.IsNullOrWhiteSpace(draft.LiteralObjectRef) ||
@@ -117,12 +118,12 @@ internal static class AnalysisRequestNormalizer
                 draft.SourceRefs is null ||
                 draft.SourceRefs.Length is < 1 or > 64)
             {
-                return new(new ApiError(400, "invalid_draft", "A bounded literal object, conclusion, status and 1-64 source references are required."));
+                return new(new Error("A bounded literal object, conclusion, status and 1-64 source references are required.", ErrorSource.Client, ErrorType.CorruptedInfo) { HttpStatusCode = HttpStatusCode.BadRequest });
             }
 
             if (draft.ModelExplanation?.Length > 16000)
             {
-                return new(new ApiError(400, "invalid_model_explanation", "Raw model explanation must be bounded."));
+                return new(new Error("Raw model explanation must be bounded.", ErrorSource.Client, ErrorType.CorruptedInfo) { HttpStatusCode = HttpStatusCode.BadRequest });
             }
 
             if (draft.ExpectedPreviousRevisionId is not null)
@@ -155,7 +156,7 @@ internal static class AnalysisRequestNormalizer
                         u.Query?.Length > 2000 ||
                         u.MaterialId?.Length > 200)))
             {
-                return new(new ApiError(400, "invalid_assessment", "Conditions must have bound evidence; missing facts require bounded scope and queries."));
+                return new(new Error("Conditions must have bound evidence; missing facts require bounded scope and queries.", ErrorSource.Client, ErrorType.CorruptedInfo) { HttpStatusCode = HttpStatusCode.BadRequest });
             }
 
             if (draft.Question is { } q &&
@@ -166,7 +167,7 @@ internal static class AnalysisRequestNormalizer
                     q.Frame == "budget_delta" &&
                     q.BaselinePeriod == "unknown"))
             {
-                return new(new ApiError(400, "incompatible_question_calculation", "Calculation must match a known question unit, period and comparison baseline."));
+                return new(new Error("Calculation must match a known question unit, period and comparison baseline.", ErrorSource.Client, ErrorType.CorruptedInfo) { HttpStatusCode = HttpStatusCode.BadRequest });
             }
 
             if (draft.Impact is { } impact &&
@@ -180,14 +181,14 @@ internal static class AnalysisRequestNormalizer
                     impact.Urgency is < 0 or > 5 ||
                     impact.Novelty is < 0 or > 5))
             {
-                return new(new ApiError(400, "invalid_impact_metadata", "Impact metadata requires a metric/basis, explicit evidence status and 0–5 priority components."));
+                return new(new Error("Impact metadata requires a metric/basis, explicit evidence status and 0–5 priority components.", ErrorSource.Client, ErrorType.CorruptedInfo) { HttpStatusCode = HttpStatusCode.BadRequest });
             }
 
             foreach (var source in draft.SourceRefs)
             {
                 if (source is null)
                 {
-                    return new(new ApiError(400, "invalid_source_ref", "Source refs cannot contain null."));
+                    return new(new Error("Source refs cannot contain null.", ErrorSource.Client, ErrorType.CorruptedInfo) { HttpStatusCode = HttpStatusCode.BadRequest });
                 }
 
                 if (RequireId(source.MaterialId, "source materialId").Error is { } sourceMaterialIdError)
@@ -202,7 +203,7 @@ internal static class AnalysisRequestNormalizer
                     source.ContentHash.Length != 64 ||
                     !source.ContentHash.All(Uri.IsHexDigit))
                 {
-                    return new(new ApiError(400, "invalid_source_hash", "Source hashes must be SHA256 hex strings."));
+                    return new(new Error("Source hashes must be SHA256 hex strings.", ErrorSource.Client, ErrorType.CorruptedInfo) { HttpStatusCode = HttpStatusCode.BadRequest });
                 }
             }
 

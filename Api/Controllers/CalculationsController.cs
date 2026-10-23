@@ -1,19 +1,21 @@
+using System.Net;
+using AlfaHackaton.Controllers.Controllers;
+using AlfaHackaton.Result.Errors;
 using InsightService.Contracts.Calculations;
-using InsightService.Models;
 using InsightService.Services;
 using Microsoft.AspNetCore.Mvc;
 namespace InsightService.Controllers;
 
 [ApiController]
 [Route("insight-service/internal/calculations")]
-public sealed class CalculationsController : ApiControllerBase
+public sealed class CalculationsController : BaseController
 {
     [HttpPost("preview")]
     public IActionResult Preview([FromBody] Calculation[] calculations)
     {
         if (calculations.Length > 32)
         {
-            return OkOrProblem<object>(new(new ApiError(400, "calculation_budget", "At most 32 calculations may be previewed.")));
+            return OkOrProblem<object>(new(new Error("At most 32 calculations may be previewed.", ErrorSource.Client, ErrorType.CorruptedInfo) { HttpStatusCode = HttpStatusCode.BadRequest }));
         }
         return Ok(new
         {
@@ -28,8 +30,7 @@ public sealed class CalculationsController : ApiControllerBase
             return new
             {
                 valid = false,
-                code = error is ApiError apiError ? apiError.Code : "invalid_calculation",
-                message = error.Title
+                errorMessage = error.Title
             };
         }
         return new

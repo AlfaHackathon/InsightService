@@ -18,7 +18,7 @@ public sealed class ApplicabilityTests : IDisposable
     public async Task ConditionalWithoutEstablishedCompanyExposureCannotBeSaved()
     {
         var error = await ResultAssert.ErrorAsync(async () => await Service().Save(Request()));
-        Assert.Equal("applicability_not_established", error.Code);
+        Assert.Equal("Company exposure requires a cited own documentary source; a profile flag or public macro source is insufficient. Preserve unknown.", error.Title);
         Assert.Empty((await (Service().GetEffects(company, "news")).RequireContentAsync()));
     }
 
@@ -39,7 +39,7 @@ public sealed class ApplicabilityTests : IDisposable
 
             ]
         };
-        Assert.Equal("applicability_not_established", (await ResultAssert.ErrorAsync(async () => await Service().Save(request))).Code);
+        Assert.Equal("Company exposure requires a cited own documentary source; a profile flag or public macro source is insufficient. Preserve unknown.", (await ResultAssert.ErrorAsync(async () => await Service().Save(request))).Title);
     }
 
     [Fact]
@@ -101,7 +101,7 @@ public sealed class ApplicabilityTests : IDisposable
 
             ]
         };
-        Assert.Equal("unknown_calculation", (await ResultAssert.ErrorAsync(async () => await Service().Save(request))).Code);
+        Assert.Equal("Unknown impact cannot be represented by a monetary calculation or zero.", (await ResultAssert.ErrorAsync(async () => await Service().Save(request))).Title);
     }
 
     private sealed class Sources(Guid company) : ISourceResolver

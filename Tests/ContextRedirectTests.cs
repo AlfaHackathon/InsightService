@@ -39,8 +39,8 @@ public sealed class ContextRedirectTests
             Assert.False(destinationSaw.RequestReceived);
             Assert.False(destinationSaw.SecretReceived);
             Assert.NotNull(failure);
-            Assert.Equal(502, failure.StatusCode);
-            Assert.Equal("context_rejected", failure.Code);
+            Assert.Equal(502, (int)failure.HttpStatusCode!);
+            Assert.Equal("ContextService rejected source resolution; no effect was saved.", failure.Title);
         }
         finally
         {

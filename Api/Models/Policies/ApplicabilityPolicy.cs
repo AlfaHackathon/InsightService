@@ -1,4 +1,6 @@
+using System.Net;
 using AlfaHackaton.Result;
+using AlfaHackaton.Result.Errors;
 using InsightService.Contracts.Analyses;
 using InsightService.Contracts.Context;
 
@@ -27,12 +29,12 @@ public static class ApplicabilityPolicy
                 app.Assumptions.Any(s => string.IsNullOrWhiteSpace(s) ||
                     s.Length > 1000))
             {
-                return new(new ApiError(400, "invalid_applicability", "A bounded applicability assessment is required."));
+                return new(new Error("A bounded applicability assessment is required.", ErrorSource.Client, ErrorType.CorruptedInfo) { HttpStatusCode = HttpStatusCode.BadRequest });
             }
 
             if (app.SourceRefs.Any(r => !draft.SourceRefs.Contains(r)))
             {
-                return new(new ApiError(422, "unbound_applicability", "Applicability must cite this question's exact sources."));
+                return new(new Error("Applicability must cite this question's exact sources.", ErrorSource.Client, ErrorType.CorruptedInfo) { HttpStatusCode = HttpStatusCode.UnprocessableEntity });
             }
         }
 
@@ -64,16 +66,14 @@ public static class ApplicabilityPolicy
                 (evidence == "unaffected" &&
                     app.Status is not ("established" or "excluded")))
             {
-                return new(new ApiError(422,
-                    "applicability_not_established",
-                    "Company exposure requires a cited own documentary source; a profile flag or public macro source is insufficient. Preserve unknown."));
+                return new(new Error("Company exposure requires a cited own documentary source; a profile flag or public macro source is insufficient. Preserve unknown.", ErrorSource.Client, ErrorType.CorruptedInfo) { HttpStatusCode = HttpStatusCode.UnprocessableEntity });
             }
         }
 
         if (evidence == "conditional" &&
             app?.Assumptions.Length is not > 0)
         {
-            return new(new ApiError(422, "scenario_assumptions_required", "Conditional requires an explicit scenario on established company exposure."));
+            return new(new Error("Conditional requires an explicit scenario on established company exposure.", ErrorSource.Client, ErrorType.CorruptedInfo) { HttpStatusCode = HttpStatusCode.UnprocessableEntity });
         }
 
         if (evidence == "supported" &&
@@ -81,13 +81,13 @@ public static class ApplicabilityPolicy
                 (draft.Assessment?.Unknowns.Length ?? 0) != 0 ||
                 draft.Assessment?.Conditions.Any(c => c.Status != "supported") == true))
         {
-            return new(new ApiError(422, "unresolved_supported_claim", "A supported consequence cannot retain unresolved required inputs or scenario assumptions."));
+            return new(new Error("A supported consequence cannot retain unresolved required inputs or scenario assumptions.", ErrorSource.Client, ErrorType.CorruptedInfo) { HttpStatusCode = HttpStatusCode.UnprocessableEntity });
         }
 
         if (evidence == "unknown" &&
             draft.Calculation is not null)
         {
-            return new(new ApiError(422, "unknown_calculation", "Unknown impact cannot be represented by a monetary calculation or zero."));
+            return new(new Error("Unknown impact cannot be represented by a monetary calculation or zero.", ErrorSource.Client, ErrorType.CorruptedInfo) { HttpStatusCode = HttpStatusCode.UnprocessableEntity });
         }
 
         return new();

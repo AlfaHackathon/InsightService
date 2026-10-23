@@ -1,12 +1,13 @@
+using System.Net;
 using System.Text.Json;
 using AlfaHackaton.DapperContext.Common.Interfaces.Dapper;
 using AlfaHackaton.DapperContext.Dapper;
 using AlfaHackaton.Result;
+using AlfaHackaton.Result.Errors;
 using InsightService.Common;
 using InsightService.Contracts.Analyses;
 using InsightService.Contracts.Questions;
 using InsightService.Contracts.SourceReactions;
-using InsightService.Models;
 using InsightService.Models.Persistence;
 using InsightService.Repositories.Interfaces;
 using InsightService.Repositories.Postgres;
@@ -60,7 +61,7 @@ public sealed class EffectRepository(IDapperContext context) : IEffectRepository
         {
             if (existingReceipt.RequestHash != hash)
             {
-                return new(new ApiError(409, "analysis_payload_conflict", "This completed news analysis has a different payload."));
+                return new(new Error("This completed news analysis has a different payload.", ErrorSource.Client, ErrorType.CorruptedInfo) { HttpStatusCode = HttpStatusCode.Conflict });
             }
 
             transaction.Commit();
@@ -71,7 +72,7 @@ public sealed class EffectRepository(IDapperContext context) : IEffectRepository
         if (request.ExpectedStateVersion is { } expected &&
             expected != await StateVersion(transaction, request.CompanyId))
         {
-            return new(new ApiError(409, "stale_company_snapshot", "The immutable company snapshot changed before atomic commit."));
+            return new(new Error("The immutable company snapshot changed before atomic commit.", ErrorSource.Client, ErrorType.CorruptedInfo) { HttpStatusCode = HttpStatusCode.Conflict });
         }
 
         var saved = new List<SavedEffectResponse>(drafts.Count);
@@ -131,7 +132,7 @@ public sealed class EffectRepository(IDapperContext context) : IEffectRepository
             after is not null &&
             !Guid.TryParse(after, out _))
         {
-            return new(new ApiError(400, "invalid_recipient_cursor", "asOf and a valid company cursor are required."));
+            return new(new Error("asOf and a valid company cursor are required.", ErrorSource.Client, ErrorType.CorruptedInfo) { HttpStatusCode = HttpStatusCode.BadRequest });
         }
 
         using var transaction = await InsightTransaction.OpenAsync(context);

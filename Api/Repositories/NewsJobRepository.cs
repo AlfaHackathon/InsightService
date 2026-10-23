@@ -1,12 +1,13 @@
+using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using AlfaHackaton.DapperContext.Common.Interfaces.Dapper;
 using AlfaHackaton.DapperContext.Dapper;
 using AlfaHackaton.Result;
+using AlfaHackaton.Result.Errors;
 using InsightService.Common;
 using InsightService.Contracts.NewsJobs;
-using InsightService.Models;
 using InsightService.Models.Persistence;
 using InsightService.Repositories.Interfaces;
 using InsightService.Repositories.Postgres;
@@ -34,7 +35,7 @@ public sealed class NewsJobRepository(IDapperContext context) : INewsJobReposito
             request.Parameters.ValueKind != JsonValueKind.Object ||
             request.Parameters.GetRawText().Length > 32000)
         {
-            return new(new ApiError(400, "invalid_job", "A job requires asOf and bounded object parameters."));
+            return new(new Error("A job requires asOf and bounded object parameters.", ErrorSource.Client, ErrorType.CorruptedInfo) { HttpStatusCode = HttpStatusCode.BadRequest });
         }
 
         request = request with
@@ -51,7 +52,7 @@ public sealed class NewsJobRepository(IDapperContext context) : INewsJobReposito
         {
             if (existing.RequestHash != hash)
             {
-                return new(new ApiError(409, "job_request_conflict", "A job ID cannot be reused with another request."));
+                return new(new Error("A job ID cannot be reused with another request.", ErrorSource.Client, ErrorType.CorruptedInfo) { HttpStatusCode = HttpStatusCode.Conflict });
             }
 
             return new(JsonSerializer.Deserialize<NewsJob>(existing.Payload, AnalysisProtocol.Json)!, null);
@@ -75,7 +76,7 @@ public sealed class NewsJobRepository(IDapperContext context) : INewsJobReposito
         var readResult = await Read(transaction, id);
         if (readResult is null)
         {
-            return new(new ApiError(404, "job_not_found", "News job was not found."));
+            return new(new Error("News job was not found.", ErrorSource.Client, ErrorType.NotFound) { HttpStatusCode = HttpStatusCode.NotFound });
         }
 
         return new(readResult, null);
@@ -128,14 +129,14 @@ public sealed class NewsJobRepository(IDapperContext context) : INewsJobReposito
             update.Checkpoint.GetRawText().Length > 4000000 ||
             update.Error?.Length > 2000)
         {
-            return new(new ApiError(400, "invalid_job_update", "Status and bounded checkpoint/error are required."));
+            return new(new Error("Status and bounded checkpoint/error are required.", ErrorSource.Client, ErrorType.CorruptedInfo) { HttpStatusCode = HttpStatusCode.BadRequest });
         }
 
         using var transaction = await InsightTransaction.OpenAsync(context);
         var readResult2 = await Read(transaction, id);
         if (readResult2 is null)
         {
-            return new(new ApiError(404, "job_not_found", "News job was not found."));
+            return new(new Error("News job was not found.", ErrorSource.Client, ErrorType.NotFound) { HttpStatusCode = HttpStatusCode.NotFound });
         }
 
         var old = readResult2;
@@ -145,7 +146,7 @@ public sealed class NewsJobRepository(IDapperContext context) : INewsJobReposito
             old.Version != update.Version ||
             old.LeaseUntil < now)
         {
-            return new(new ApiError(409, "job_lease_conflict", "This worker no longer owns the current job lease/version."));
+            return new(new Error("This worker no longer owns the current job lease/version.", ErrorSource.Client, ErrorType.CorruptedInfo) { HttpStatusCode = HttpStatusCode.Conflict });
         }
 
         var next = old with
@@ -172,13 +173,13 @@ public sealed class NewsJobRepository(IDapperContext context) : INewsJobReposito
         var readResult3 = await Read(transaction, id);
         if (readResult3 is null)
         {
-            return new(new ApiError(404, "job_not_found", "News job was not found."));
+            return new(new Error("News job was not found.", ErrorSource.Client, ErrorType.NotFound) { HttpStatusCode = HttpStatusCode.NotFound });
         }
 
         var old = readResult3;
         if (old.Status != "failed")
         {
-            return new(new ApiError(409, "job_not_failed", "Only explicitly failed jobs can be retried."));
+            return new(new Error("Only explicitly failed jobs can be retried.", ErrorSource.Client, ErrorType.CorruptedInfo) { HttpStatusCode = HttpStatusCode.Conflict });
         }
 
         var next = old with

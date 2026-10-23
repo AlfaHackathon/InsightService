@@ -1,13 +1,14 @@
+using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using AlfaHackaton.Result;
+using AlfaHackaton.Result.Errors;
 using InsightService.Common;
 using InsightService.Contracts.Analyses;
 using InsightService.Contracts.Context;
 using InsightService.Contracts.Questions;
 using InsightService.Contracts.SourceReactions;
-using InsightService.Models;
 using InsightService.Models.Policies;
 using InsightService.Repositories.Interfaces;
 using InsightService.Services.Interfaces;
@@ -37,7 +38,7 @@ public sealed class AnalysisService(IEffectRepository repository, ISourceResolve
         var findAnalysisResult = (await repository.FindAnalysis(companyId, materialId, versionId, trigger))?.Receipt;
         if (findAnalysisResult is null)
         {
-            return new(new ApiError(404, "analysis_not_found", "No completed analysis receipt exists for this news version."));
+            return new(new Error("No completed analysis receipt exists for this news version.", ErrorSource.Client, ErrorType.NotFound) { HttpStatusCode = HttpStatusCode.NotFound });
         }
 
         return new(findAnalysisResult, null);
@@ -78,7 +79,7 @@ public sealed class AnalysisService(IEffectRepository repository, ISourceResolve
         var getEffectResult = await repository.GetEffect(effectId);
         if (getEffectResult is null)
         {
-            return new(new ApiError(404, "effect_not_found", "Effect was not found."));
+            return new(new Error("Effect was not found.", ErrorSource.Client, ErrorType.NotFound) { HttpStatusCode = HttpStatusCode.NotFound });
         }
 
         return new(getEffectResult, null);
@@ -113,7 +114,7 @@ public sealed class AnalysisService(IEffectRepository repository, ISourceResolve
                     JsonSerializer.Serialize(legacyNormalization.Content.Item1, Json))));
                 if (priorReceipt.RequestHash != legacyHash)
                 {
-                    return new(new ApiError(409, "analysis_payload_conflict", "This completed news analysis has a different payload."));
+                    return new(new Error("This completed news analysis has a different payload.", ErrorSource.Client, ErrorType.CorruptedInfo) { HttpStatusCode = HttpStatusCode.Conflict });
                 }
             }
 
@@ -139,7 +140,7 @@ public sealed class AnalysisService(IEffectRepository repository, ISourceResolve
             {
                 if (cache.Count >= 128)
                 {
-                    return new(new ApiError(422, "source_budget", "Analysis is limited to 128 resolved source versions."));
+                    return new(new Error("Analysis is limited to 128 resolved source versions.", ErrorSource.Client, ErrorType.CorruptedInfo) { HttpStatusCode = HttpStatusCode.UnprocessableEntity });
                 }
 
                 var materialResolution = await resolver.GetAsync(material, version, ct);
@@ -152,7 +153,7 @@ public sealed class AnalysisService(IEffectRepository repository, ISourceResolve
                 if (value.MaterialId != material ||
                     value.VersionId != version)
                 {
-                    return new(new ApiError(502, "invalid_context_identity", "ContextService returned a different material identity."));
+                    return new(new Error("ContextService returned a different material identity.", ErrorSource.External, ErrorType.Undefined) { HttpStatusCode = HttpStatusCode.BadGateway });
                 }
 
                 cache.Add((material, version), value);
@@ -160,19 +161,19 @@ public sealed class AnalysisService(IEffectRepository repository, ISourceResolve
 
             if (value.KnownAt > normalized.AsOf)
             {
-                return new(new ApiError(422, "source_not_known", "A source version was not known at analysis asOf."));
+                return new(new Error("A source version was not known at analysis asOf.", ErrorSource.Client, ErrorType.CorruptedInfo) { HttpStatusCode = HttpStatusCode.UnprocessableEntity });
             }
 
             if (value.CompanyIds.Length > 0 &&
                 !value.CompanyIds.Contains(normalized.CompanyId))
             {
-                return new(new ApiError(422, "source_company_scope", "A source version belongs to another company scope."));
+                return new(new Error("A source version belongs to another company scope.", ErrorSource.Client, ErrorType.CorruptedInfo) { HttpStatusCode = HttpStatusCode.UnprocessableEntity });
             }
 
             if (value.Kind == "company" &&
                 !value.CompanyIds.Contains(normalized.CompanyId))
             {
-                return new(new ApiError(422, "source_company_scope", "Company material requires the target company Guid."));
+                return new(new Error("Company material requires the target company Guid.", ErrorSource.Client, ErrorType.CorruptedInfo) { HttpStatusCode = HttpStatusCode.UnprocessableEntity });
             }
 
             return new(value, null);
@@ -198,7 +199,7 @@ public sealed class AnalysisService(IEffectRepository repository, ISourceResolve
 
         if (news.Kind != "news")
         {
-            return new(new ApiError(422, "not_news", "Analysis must refer to a news material version."));
+            return new(new Error("Analysis must refer to a news material version.", ErrorSource.Client, ErrorType.CorruptedInfo) { HttpStatusCode = HttpStatusCode.UnprocessableEntity });
         }
 
         var current = new Dictionary<string, EffectResponse>(StringComparer.Ordinal);
@@ -213,16 +214,11 @@ public sealed class AnalysisService(IEffectRepository repository, ISourceResolve
                 {
                     key = questionKey.Content!;
                 }
-                else if (questionKey.Error is not ApiError { Code: "invalid_question_identity" })
-                {
-                    return new(questionKey.Error);
-                }
-
             }
 
             if (!current.TryAdd(key, effect))
             {
-                return new(new ApiError(409, "ambiguous_legacy_question", "Multiple stored histories normalize to this question; reconcile explicitly before writing."));
+                return new(new Error("Multiple stored histories normalize to this question; reconcile explicitly before writing.", ErrorSource.Client, ErrorType.CorruptedInfo) { HttpStatusCode = HttpStatusCode.Conflict });
             }
         }
 
@@ -233,7 +229,7 @@ public sealed class AnalysisService(IEffectRepository repository, ISourceResolve
                 draft.Question is { } scopedQuestion &&
                 !normalized.Mechanisms.Contains(scopedQuestion.Mechanism))
             {
-                return new(new ApiError(422, "question_outside_scope", "This draft mechanism is outside the explicit analysis scope."));
+                return new(new Error("This draft mechanism is outside the explicit analysis scope.", ErrorSource.Client, ErrorType.CorruptedInfo) { HttpStatusCode = HttpStatusCode.UnprocessableEntity });
             }
 
             if (trigger is not null &&
@@ -242,14 +238,14 @@ public sealed class AnalysisService(IEffectRepository repository, ISourceResolve
                         s.VersionId == trigger.VersionId &&
                         s.ContentHash == trigger.ContentHash)))
             {
-                return new(new ApiError(422, "trigger_citation_required", "A source revision reassessment must cite its exact triggering original and identify the question."));
+                return new(new Error("A source revision reassessment must cite its exact triggering original and identify the question.", ErrorSource.Client, ErrorType.CorruptedInfo) { HttpStatusCode = HttpStatusCode.UnprocessableEntity });
             }
 
             if (!draft.SourceRefs.Any(s => s.MaterialId == news.MaterialId &&
                     s.VersionId == news.VersionId &&
                     s.ContentHash == news.ContentHash))
             {
-                return new(new ApiError(422, "current_news_citation_required", "Each effect must cite the exact current news version and hash."));
+                return new(new Error("Each effect must cite the exact current news version and hash.", ErrorSource.Client, ErrorType.CorruptedInfo) { HttpStatusCode = HttpStatusCode.UnprocessableEntity });
             }
 
             foreach (var reference in draft.SourceRefs)
@@ -263,7 +259,7 @@ public sealed class AnalysisService(IEffectRepository repository, ISourceResolve
                 var source = materialIdResolution2.Content!;
                 if (source.ContentHash != reference.ContentHash)
                 {
-                    return new(new ApiError(422, "source_hash_mismatch", "A source hash does not match its immutable original version."));
+                    return new(new Error("A source hash does not match its immutable original version.", ErrorSource.Client, ErrorType.CorruptedInfo) { HttpStatusCode = HttpStatusCode.UnprocessableEntity });
                 }
             }
 
@@ -287,17 +283,17 @@ public sealed class AnalysisService(IEffectRepository repository, ISourceResolve
                         return new(concurrentlyCompleted, null);
                     }
 
-                    return new(new ApiError(409, "stale_previous_revision", "expectedPreviousRevisionId must be the actual latest revision."));
+                    return new(new Error("expectedPreviousRevisionId must be the actual latest revision.", ErrorSource.Client, ErrorType.CorruptedInfo) { HttpStatusCode = HttpStatusCode.Conflict });
                 }
 
                 if (draft.LiteralObjectRef != existing.LiteralObjectRef)
                 {
-                    return new(new ApiError(409, "literal_object_conflict", "An existing effectKey cannot be rebound to a different literal object."));
+                    return new(new Error("An existing effectKey cannot be rebound to a different literal object.", ErrorSource.Client, ErrorType.CorruptedInfo) { HttpStatusCode = HttpStatusCode.Conflict });
                 }
 
                 if (normalized.AsOf < existing.CurrentRevision.AsOf)
                 {
-                    return new(new ApiError(409, "stale_analysis_time", "An unprocessed historical event cannot replace a more recent assessment; reassess at current knowledge time."));
+                    return new(new Error("An unprocessed historical event cannot replace a more recent assessment; reassess at current knowledge time.", ErrorSource.Client, ErrorType.CorruptedInfo) { HttpStatusCode = HttpStatusCode.Conflict });
                 }
 
                 if (trigger is not null)
@@ -336,12 +332,12 @@ public sealed class AnalysisService(IEffectRepository repository, ISourceResolve
 
                 if (!reached)
                 {
-                    return new(new ApiError(409, "news_correction_lineage", "The news version must correct the effect's actual preceding news version."));
+                    return new(new Error("The news version must correct the effect's actual preceding news version.", ErrorSource.Client, ErrorType.CorruptedInfo) { HttpStatusCode = HttpStatusCode.Conflict });
                 }
             }
             else if (draft.ExpectedPreviousRevisionId is not null)
             {
-                return new(new ApiError(409, "missing_previous_effect", "A new effect cannot reference an unknown previous revision."));
+                return new(new Error("A new effect cannot reference an unknown previous revision.", ErrorSource.Client, ErrorType.CorruptedInfo) { HttpStatusCode = HttpStatusCode.Conflict });
             }
         }
 

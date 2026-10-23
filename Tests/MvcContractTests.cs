@@ -55,8 +55,8 @@ public sealed class MvcContractTests : IDisposable
         using var absent = await client.GetAsync($"/insight-service/internal/analyses?companyId={Guid.NewGuid()}&newsMaterialId=news&newsVersionId=v1");
         Assert.Equal(HttpStatusCode.NotFound, absent.StatusCode);
         using var body = JsonDocument.Parse(await absent.Content.ReadAsStringAsync());
-        Assert.Equal("analysis_not_found", body.RootElement.GetProperty("code").GetString());
-        Assert.False(body.RootElement.TryGetProperty("errorMessage", out _));
+        Assert.Equal("No completed analysis receipt exists for this news version.", body.RootElement.GetProperty("errorMessage").GetString());
+        Assert.False(body.RootElement.TryGetProperty("code", out _));
         using var anonymous = factory.CreateClient();
         using var forbidden = await anonymous.GetAsync("/insight-service/internal/source-cursor");
         Assert.Equal(HttpStatusCode.Forbidden, forbidden.StatusCode);
@@ -64,7 +64,7 @@ public sealed class MvcContractTests : IDisposable
     }
 
     [Fact]
-    public async Task ReturnedValidationErrorPreservesCodeAndStatus()
+    public async Task ReturnedValidationErrorUsesPackageEnvelopeAndStatus()
     {
         using var factory = Factory();
         using var client = Authorized(factory);
@@ -89,9 +89,8 @@ public sealed class MvcContractTests : IDisposable
         });
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-        Assert.Equal("invalid_model_explanation", json.RootElement.GetProperty("code").GetString());
-        Assert.Equal("Raw model explanation must be bounded.", json.RootElement.GetProperty("message").GetString());
-        Assert.Equal(2, json.RootElement.EnumerateObject().Count());
+        Assert.Equal("Raw model explanation must be bounded.", json.RootElement.GetProperty("errorMessage").GetString());
+        Assert.Single(json.RootElement.EnumerateObject());
     }
 
     [Fact]
@@ -110,7 +109,7 @@ public sealed class MvcContractTests : IDisposable
         Assert.True(rows[0].GetProperty("valid").GetBoolean());
         Assert.Equal("2", rows[0].GetProperty("result").GetString());
         Assert.False(rows[1].GetProperty("valid").GetBoolean());
-        Assert.Equal("division_by_zero", rows[1].GetProperty("code").GetString());
+        Assert.Equal("The expression divides by zero.", rows[1].GetProperty("errorMessage").GetString());
         Assert.False(rows[1].TryGetProperty("result", out _));
     }
 
@@ -136,7 +135,7 @@ public sealed class MvcContractTests : IDisposable
         {
             Assert.Single(responses, response => response.StatusCode == HttpStatusCode.OK);
             var conflict = Assert.Single(responses, response => response.StatusCode == HttpStatusCode.Conflict);
-            Assert.Contains("source_cursor_conflict", await conflict.Content.ReadAsStringAsync());
+            Assert.Equal("Another consumer advanced the source cursor.", (await conflict.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("errorMessage").GetString());
         }
         finally
         {
