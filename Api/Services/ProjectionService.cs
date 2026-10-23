@@ -12,7 +12,7 @@ public sealed class ProjectionService(IEffectRepository repository, CompanyKnowl
 {
     public async Task<Result<CanonicalProjection>> Canonical(ProjectionRequest request)
     {
-        if (request.Companies is null || request.Companies.Length > 256 || request.Companies.Any(c => c.CompanyId == Guid.Empty) || request.AsOf == default(DateTimeOffset))
+        if (request.Companies is null || request.Companies.Length > 10000 || request.Companies.Any(c => c.CompanyId == Guid.Empty) || request.AsOf == default(DateTimeOffset))
         {
             return new(InvalidRequest());
         }
@@ -187,7 +187,7 @@ public sealed class ProjectionService(IEffectRepository repository, CompanyKnowl
 
     private async Task<Result<GroupExpansion[]>> ResolveGroups(GroupExpansion[] requested, DateTimeOffset asOf, CancellationToken ct)
     {
-        if (requested.Length > 32 || requested.Any(g => string.IsNullOrWhiteSpace(g.GroupId) || g.GroupId.Length > 200))
+        if (requested.Length > 64 || requested.Any(g => string.IsNullOrWhiteSpace(g.GroupId) || g.GroupId.Length > 200))
         {
             return new(InvalidRequest());
         }
