@@ -3,6 +3,7 @@ using AlfaHackaton.Result;
 using AlfaHackaton.Result.Errors;
 using InsightService.Contracts.Analyses;
 using InsightService.Contracts.Context;
+using InsightService.Contracts.Questions;
 
 namespace InsightService.Models.Policies;
 
@@ -10,7 +11,15 @@ public static class ApplicabilityPolicy
 {
     public static async Task<Result> Validate(EffectDraft draft, Guid company, Func<string, string, Task<Result<MaterialVersion>>> material)
     {
-        if (draft.Question is null)
+        var hasDependencies = draft.Assessment?.Conditions?.Any(c => c is not null &&
+            (c.Id is not null || c.Assertion is not null || c.DependsOn is not null)) == true ||
+            draft.Assessment?.Unknowns?.Any(u => u?.Id is not null) == true;
+        if (hasDependencies && ValidateDependencies(draft) is { } dependencyError)
+        {
+            return new(dependencyError);
+        }
+
+        if (draft.Question is null && !hasDependencies)
         {
             return new(); // Historical non-question write contract.
         }
@@ -92,6 +101,105 @@ public static class ApplicabilityPolicy
 
         return new();
     }
+
+    private static Error? ValidateDependencies(EffectDraft draft)
+    {
+        var assessment = draft.Assessment!;
+        if (assessment.Conditions is null || assessment.Unknowns is null ||
+            assessment.Conditions.Length > 16 || assessment.Unknowns.Length > 16)
+        {
+            return InvalidDependencies();
+        }
+
+        var ids = new HashSet<string>(StringComparer.Ordinal);
+        var conditions = new Dictionary<string, ApplicabilityCondition>(StringComparer.Ordinal);
+        foreach (var condition in assessment.Conditions)
+        {
+            if (condition is null || !ValidId(condition.Id) || !ids.Add(condition.Id!) ||
+                condition.Status is not ("supported" or "contradicted" or "unknown") ||
+                condition.Assertion is not ("observed" or "derived" or "conditional") ||
+                condition.DependsOn is null || condition.DependsOn.Length > 16 ||
+                condition.DependsOn.Any(id => !ValidId(id)) ||
+                condition.DependsOn.Distinct(StringComparer.Ordinal).Count() != condition.DependsOn.Length ||
+                (condition.Assertion == "observed" ? condition.DependsOn.Length != 0 : condition.DependsOn.Length == 0))
+            {
+                return InvalidDependencies();
+            }
+            conditions.Add(condition.Id!, condition);
+        }
+        foreach (var unknown in assessment.Unknowns)
+        {
+            if (unknown is null || !ValidId(unknown.Id) || !ids.Add(unknown.Id!))
+            {
+                return InvalidDependencies();
+            }
+        }
+        if (conditions.Values.Any(c => c.DependsOn!.Any(id => !ids.Contains(id))))
+        {
+            return InvalidDependencies();
+        }
+
+        // Validate the whole graph, including unresolved claims and disconnected branches.
+        var visiting = new HashSet<string>(StringComparer.Ordinal);
+        var visited = new HashSet<string>(StringComparer.Ordinal);
+        bool Acyclic(string id)
+        {
+            if (visited.Contains(id) || !conditions.TryGetValue(id, out var condition))
+            {
+                return true;
+            }
+            if (!visiting.Add(id))
+            {
+                return false;
+            }
+            if (!condition.DependsOn!.All(Acyclic))
+            {
+                return false;
+            }
+            visiting.Remove(id);
+            visited.Add(id);
+            return true;
+        }
+        if (!conditions.Keys.All(Acyclic))
+        {
+            return InvalidDependencies();
+        }
+
+        var support = new Dictionary<string, bool>(StringComparer.Ordinal);
+        bool Supported(string id)
+        {
+            if (!support.TryGetValue(id, out var supported))
+            {
+                supported = conditions.TryGetValue(id, out var condition) && condition.Status == "supported" &&
+                    condition.DependsOn!.All(Supported);
+                support.Add(id, supported);
+            }
+            return supported;
+        }
+        foreach (var condition in conditions.Values)
+        {
+            if (condition.Assertion == "derived" && condition.Status == "supported" &&
+                !condition.DependsOn!.All(Supported))
+            {
+                return new("A supported derived condition requires supported evidence dependencies.", ErrorSource.Client, ErrorType.CorruptedInfo)
+                { HttpStatusCode = HttpStatusCode.UnprocessableEntity };
+            }
+            if (condition.Assertion == "conditional" &&
+                (condition.Status != "unknown" || draft.Impact?.EvidenceStatus != "conditional" ||
+                    assessment.Applicability is not { Status: "established", Basis: "documented_exposure", Assumptions.Length: > 0 }))
+            {
+                return new("Conditional evidence requires an unresolved scenario on established exposure with explicit assumptions.", ErrorSource.Client, ErrorType.CorruptedInfo)
+                { HttpStatusCode = HttpStatusCode.UnprocessableEntity };
+            }
+        }
+        return null;
+    }
+
+    private static bool ValidId(string? id) => id is { Length: > 0 and <= 64 } && id[0] is >= 'a' and <= 'z' &&
+        id.All(c => c is >= 'a' and <= 'z' or >= '0' and <= '9' or '_' or '-');
+
+    private static Error InvalidDependencies() => new("Invalid evidence dependencies.", ErrorSource.Client, ErrorType.CorruptedInfo)
+    { HttpStatusCode = HttpStatusCode.BadRequest };
 
     public static string? PublicationClass(EffectDraft draft) => draft.Question is null ? null : draft.Impact?.EvidenceStatus switch
     {
