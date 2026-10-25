@@ -1,0 +1,836 @@
+{
+  "provenance": "Reconstructed domain inputs from exact final tool arguments, source catalogs and immutable receipts; original save HTTP body was not captured.",
+  "cases": [
+    {
+      "request": {
+        "asOf": "2026-10-25T11:18:57.594156Z",
+        "companyId": "9d2ad610-eeb7-48e9-a6dc-50081bf61341",
+        "newsMaterialId": "synthetic-quality-20261025-fixedloan-b-001-news",
+        "newsVersionId": "v1",
+        "drafts": [
+          {
+            "conclusion": "Новость сообщает рост именно FixtureBench-A с 12% до 14% с 2027-01-01. Для документированного FixtureLoan-B-001 это даёт за 2027 год дополнительный процентный расход RUB 20000 относительно договорного сценария, если ставка оставалась бы 12%: новая сумма процентов по контракту RUB 140000, исходная RUB 120000. Это сумма договорного начисления за год, а не доказательство фактического платежа. Контракт предусматривает единовременную оплату 2027-12-31. Вывод касается только этого займа; полной совокупной экспозиции компании источники не устанавливают.",
+            "status": "announced",
+            "impact": {
+              "metric": "expense_delta",
+              "amountBasis": "annual_run_rate",
+              "economicObjectId": "FixtureLoan-B-001",
+              "evidenceStatus": "supported",
+              "importance": 3,
+              "urgency": 2,
+              "novelty": 3
+            },
+            "effectKey": "draft-0",
+            "literalObjectRef": "company:9d2ad610-eeb7-48e9-a6dc-50081bf61341",
+            "question": {
+              "mechanism": "financing_cost",
+              "frame": "absolute",
+              "unit": "RUB",
+              "targetPeriod": "2027",
+              "baselinePeriod": "unknown",
+              "basis": "annual_run_rate"
+            },
+            "assessment": {
+              "unknowns": [],
+              "conditions": [
+                {
+                  "id": "loan_terms",
+                  "assertion": "observed",
+                  "dependsOn": [],
+                  "fact": "По FixtureLoan-B-001 principal RUB 1000000 неизменен все 365 дней 2027 года; простая годовая ставка равна FixtureBench-A без маржи, floor, cap, капитализации, комиссий, налогов, погашений и хеджирования; пересмотр происходит немедленно при изменении индекса; day count Actual/365 Fixed.",
+                  "predicate": "Контракт устанавливает перечисленные условия и привязку ставки к FixtureBench-A.",
+                  "status": "supported",
+                  "sourceRefs": [
+                    {
+                      "materialId": "synthetic-quality-20261025-fixedloan-b-001-contract",
+                      "versionId": "v1",
+                      "contentHash": "983432cead449b03429d94b5d4769f17c52c2f524489bc8cd6409aca14c1bc2a"
+                    }
+                  ]
+                },
+                {
+                  "id": "index_change",
+                  "assertion": "observed",
+                  "dependsOn": [],
+                  "fact": "FixtureBench-A меняется с 12% до 14% годовых с 2027-01-01 и остаётся 14% до 2027-12-31; новость прямо связывает этот индекс с FixtureLoan-B-001.",
+                  "predicate": "Указанное изменение индекса вступает в силу 2027-01-01 и относится к индексу по контракту.",
+                  "status": "supported",
+                  "sourceRefs": [
+                    {
+                      "materialId": "synthetic-quality-20261025-fixedloan-b-001-news",
+                      "versionId": "v1",
+                      "contentHash": "7d4c696ac3a12894cf216fa42a3b9eea33c7d69bb7e7677d886e5e6921ebb677"
+                    }
+                  ]
+                },
+                {
+                  "id": "incremental_interest",
+                  "assertion": "derived",
+                  "dependsOn": [
+                    "loan_terms",
+                    "index_change"
+                  ],
+                  "fact": "Дополнительный договорный расход по процентам за 2027 год относительно ставки 12% составляет RUB 20000.",
+                  "predicate": "Разность процентов за один и тот же период: principal × изменение ставки × 365/365; начисление простое, principal постоянен.",
+                  "status": "supported",
+                  "sourceRefs": [
+                    {
+                      "materialId": "synthetic-quality-20261025-fixedloan-b-001-news",
+                      "versionId": "v1",
+                      "contentHash": "7d4c696ac3a12894cf216fa42a3b9eea33c7d69bb7e7677d886e5e6921ebb677"
+                    },
+                    {
+                      "materialId": "synthetic-quality-20261025-fixedloan-b-001-contract",
+                      "versionId": "v1",
+                      "contentHash": "983432cead449b03429d94b5d4769f17c52c2f524489bc8cd6409aca14c1bc2a"
+                    }
+                  ]
+                },
+                {
+                  "id": "interest_due_date",
+                  "assertion": "observed",
+                  "dependsOn": [],
+                  "fact": "Проценты за 2027 год предусмотрено выплатить единовременно 2027-12-31; источник не устанавливает факт фактической оплаты или поступления денег кредитору.",
+                  "predicate": "Контракт задаёт дату платежа процентов.",
+                  "status": "supported",
+                  "sourceRefs": [
+                    {
+                      "materialId": "synthetic-quality-20261025-fixedloan-b-001-contract",
+                      "versionId": "v1",
+                      "contentHash": "983432cead449b03429d94b5d4769f17c52c2f524489bc8cd6409aca14c1bc2a"
+                    }
+                  ]
+                }
+              ],
+              "applicability": {
+                "status": "established",
+                "basis": "documented_exposure",
+                "explanation": "Документирован конкретный кредит FixtureLoan-B-001 компании с плавающей ставкой, равной индексу FixtureBench-A. Вывод относится только к этому займу и не является агрегатом по компании.",
+                "assumptions": [],
+                "sourceRefs": [
+                  {
+                    "materialId": "synthetic-quality-20261025-fixedloan-b-001-contract",
+                    "versionId": "v1",
+                    "contentHash": "983432cead449b03429d94b5d4769f17c52c2f524489bc8cd6409aca14c1bc2a"
+                  },
+                  {
+                    "materialId": "synthetic-quality-20261025-fixedloan-b-001-news",
+                    "versionId": "v1",
+                    "contentHash": "7d4c696ac3a12894cf216fa42a3b9eea33c7d69bb7e7677d886e5e6921ebb677"
+                  }
+                ]
+              }
+            },
+            "sourceRefs": [
+              {
+                "materialId": "synthetic-quality-20261025-fixedloan-b-001-news",
+                "versionId": "v1",
+                "contentHash": "7d4c696ac3a12894cf216fa42a3b9eea33c7d69bb7e7677d886e5e6921ebb677"
+              },
+              {
+                "materialId": "synthetic-quality-20261025-fixedloan-b-001-contract",
+                "versionId": "v1",
+                "contentHash": "983432cead449b03429d94b5d4769f17c52c2f524489bc8cd6409aca14c1bc2a"
+              }
+            ],
+            "calculation": {
+              "expression": {
+                "kind": "multiply",
+                "value": null,
+                "left": {
+                  "kind": "multiply",
+                  "value": null,
+                  "left": {
+                    "kind": "value",
+                    "value": "1000000",
+                    "left": null,
+                    "right": null
+                  },
+                  "right": {
+                    "kind": "subtract",
+                    "value": null,
+                    "left": {
+                      "kind": "value",
+                      "value": "0.14",
+                      "left": null,
+                      "right": null
+                    },
+                    "right": {
+                      "kind": "value",
+                      "value": "0.12",
+                      "left": null,
+                      "right": null
+                    }
+                  }
+                },
+                "right": {
+                  "kind": "divide",
+                  "value": null,
+                  "left": {
+                    "kind": "value",
+                    "value": "365",
+                    "left": null,
+                    "right": null
+                  },
+                  "right": {
+                    "kind": "value",
+                    "value": "365",
+                    "left": null,
+                    "right": null
+                  }
+                }
+              },
+              "unit": "RUB",
+              "period": "2027"
+            },
+            "expectedPreviousRevisionId": null
+          }
+        ]
+      },
+      "materials": [
+        {
+          "materialId": "synthetic-quality-20261025-fixedloan-b-001-news",
+          "versionId": "v1",
+          "sourceId": "synthetic-quality-once",
+          "kind": "news",
+          "title": "Invented FixtureBench-A12 to14 announcement",
+          "text": "SYNTHETIC INVENTED NEWS ONLY. The same specifically named index FixtureBench-A changes from12 percent to14 percent per annum effective2027-01-01T00:00:00Z and remains14 percent through2027-12-31. This announcement refers exactly to the FixtureBench-A index named in loan FixtureLoan-B-001. No other index, contractual terms or principal amount changes.",
+          "knownAt": "2026-10-25T11:18:47.594156+00:00",
+          "publishedAt": null,
+          "correctsVersionId": null,
+          "companyIds": [
+            "9d2ad610-eeb7-48e9-a6dc-50081bf61341"
+          ],
+          "bankProfileIds": [],
+          "contentHash": "7d4c696ac3a12894cf216fa42a3b9eea33c7d69bb7e7677d886e5e6921ebb677"
+        },
+        {
+          "materialId": "synthetic-quality-20261025-fixedloan-b-001-contract",
+          "versionId": "v1",
+          "sourceId": "synthetic-quality-once",
+          "kind": "company",
+          "title": "Invented FixtureLoan-B-001 complete annual terms",
+          "text": "SYNTHETIC INVENTED TEST ONLY. This document concerns only loan FixtureLoan-B-001 held by the invented Company B. Principal is RUB 1000000 and is constant for every one of the 365 calendar days from 2027-01-01 through 2027-12-31 inclusive. Its contractual annual simple interest rate equals exactly the named index FixtureBench-A, with zero margin, no floor or cap, no compounding, fees, taxes, repayments or hedges. Before the announced change the index and contract rate are 12 percent per annum. The contract resets immediately on the effective date of any change to FixtureBench-A. Day count is Actual/365 Fixed; 2027 has exactly 365 interest-accrual days for this test. All interest for those365 days is paid once at the end of 2027-12-31. Principal and all other terms remain unchanged. This is one specific invented loan, not a claim about all obligations of the company. FixtureLoan-B-001 is distinct from the older invented contract material; this document neither replaces nor corrects that earlier loan. Consequences for this new loan must be assessed separately; no aggregate company-wide total is asserted.",
+          "knownAt": "2026-10-25T11:17:57.594156+00:00",
+          "publishedAt": null,
+          "correctsVersionId": null,
+          "companyIds": [
+            "9d2ad610-eeb7-48e9-a6dc-50081bf61341"
+          ],
+          "bankProfileIds": [],
+          "contentHash": "983432cead449b03429d94b5d4769f17c52c2f524489bc8cd6409aca14c1bc2a"
+        },
+        {
+          "materialId": "synthetic-release-20261024T182913Z-loan-b",
+          "versionId": "v1",
+          "sourceId": "synthetic-smoke",
+          "kind": "company",
+          "title": "Invented floating-rate contract B",
+          "text": "SYNTHETIC FIXTURE. Company B has a RUB 1000000 floating-rate loan, constant principal for one synthetic year. Annual interest equals reference rate plus 2 percentage points. Reference rate was 10 percent and resets immediately. No fees or hedges assumed.",
+          "knownAt": "2026-10-24T18:29:39.684568+00:00",
+          "publishedAt": null,
+          "correctsVersionId": null,
+          "companyIds": [
+            "9d2ad610-eeb7-48e9-a6dc-50081bf61341"
+          ],
+          "bankProfileIds": [],
+          "contentHash": "4df21f510ecf2feba7bfe9f1a09119960acda94e027dd4b69e34d133acfc61b1"
+        }
+      ],
+      "receipt": {
+        "analysisId": "analysis_f1f8f0d625405c9e44edb757b22c8fad4aecbee811abae1e1b96832090233fff",
+        "companyId": "9d2ad610-eeb7-48e9-a6dc-50081bf61341",
+        "bankProfileId": null,
+        "newsMaterialId": "synthetic-quality-20261025-fixedloan-b-001-news",
+        "newsVersionId": "v1",
+        "asOf": "2026-10-25T11:18:57.594156+00:00",
+        "completedAt": "2026-10-25T11:22:56.4083725+00:00",
+        "duplicate": false,
+        "resultSemantics": "saved_analysis_revisions_not_latest_heads",
+        "effects": [
+          {
+            "effectId": "question_1f2c5a3ef74f6e68afaa99fb6c018a4cd1a60eb33763b29379d5307c0e7be3a3",
+            "revisionId": "revision_e2a61c78758d4b05ba3709a448c0b707",
+            "previousRevisionId": null,
+            "duplicate": false,
+            "currentRevision": {
+              "revisionId": "revision_e2a61c78758d4b05ba3709a448c0b707",
+              "previousRevisionId": null,
+              "newsVersionId": "v1",
+              "asOf": "2026-10-25T11:18:57.594156+00:00",
+              "conclusion": "Расчётное абсолютное значение: 20000 RUB; период 2027; объект company:9d2ad610-eeb7-48e9-a6dc-50081bf61341. Применимость определяется сохранёнными условиями и статусом основания. Расчёт не подтверждает фактическую оплату.",
+              "status": "announced",
+              "sourceRefs": [
+                {
+                  "materialId": "synthetic-quality-20261025-fixedloan-b-001-contract",
+                  "versionId": "v1",
+                  "contentHash": "983432cead449b03429d94b5d4769f17c52c2f524489bc8cd6409aca14c1bc2a"
+                },
+                {
+                  "materialId": "synthetic-quality-20261025-fixedloan-b-001-news",
+                  "versionId": "v1",
+                  "contentHash": "7d4c696ac3a12894cf216fa42a3b9eea33c7d69bb7e7677d886e5e6921ebb677"
+                }
+              ],
+              "calculation": {
+                "expression": {
+                  "kind": "multiply",
+                  "value": null,
+                  "left": {
+                    "kind": "multiply",
+                    "value": null,
+                    "left": {
+                      "kind": "value",
+                      "value": "1000000",
+                      "left": null,
+                      "right": null
+                    },
+                    "right": {
+                      "kind": "subtract",
+                      "value": null,
+                      "left": {
+                        "kind": "value",
+                        "value": "0.14",
+                        "left": null,
+                        "right": null
+                      },
+                      "right": {
+                        "kind": "value",
+                        "value": "0.12",
+                        "left": null,
+                        "right": null
+                      }
+                    }
+                  },
+                  "right": {
+                    "kind": "divide",
+                    "value": null,
+                    "left": {
+                      "kind": "value",
+                      "value": "365",
+                      "left": null,
+                      "right": null
+                    },
+                    "right": {
+                      "kind": "value",
+                      "value": "365",
+                      "left": null,
+                      "right": null
+                    }
+                  }
+                },
+                "unit": "RUB",
+                "period": "2027"
+              },
+              "calculationResult": "20000",
+              "calculationArithmeticOnly": true,
+              "createdAt": "2026-10-25T11:22:56.4083725+00:00",
+              "impact": {
+                "metric": "expense_delta",
+                "amountBasis": "annual_run_rate",
+                "economicObjectId": "FixtureLoan-B-001",
+                "evidenceStatus": "supported",
+                "importance": 3,
+                "urgency": 2,
+                "novelty": 3
+              },
+              "newsMaterialId": "synthetic-quality-20261025-fixedloan-b-001-news",
+              "question": {
+                "mechanism": "financing_cost",
+                "frame": "absolute",
+                "unit": "RUB",
+                "targetPeriod": "2027",
+                "baselinePeriod": "unknown",
+                "basis": "annual_run_rate"
+              },
+              "assessment": {
+                "conditions": [
+                  {
+                    "fact": "По FixtureLoan-B-001 principal RUB 1000000 неизменен все 365 дней 2027 года; простая годовая ставка равна FixtureBench-A без маржи, floor, cap, капитализации, комиссий, налогов, погашений и хеджирования; пересмотр происходит немедленно при изменении индекса; day count Actual/365 Fixed.",
+                    "predicate": "Контракт устанавливает перечисленные условия и привязку ставки к FixtureBench-A.",
+                    "status": "supported",
+                    "sourceRefs": [
+                      {
+                        "materialId": "synthetic-quality-20261025-fixedloan-b-001-contract",
+                        "versionId": "v1",
+                        "contentHash": "983432cead449b03429d94b5d4769f17c52c2f524489bc8cd6409aca14c1bc2a"
+                      }
+                    ],
+                    "id": "loan_terms",
+                    "assertion": "observed",
+                    "dependsOn": []
+                  },
+                  {
+                    "fact": "FixtureBench-A меняется с 12% до 14% годовых с 2027-01-01 и остаётся 14% до 2027-12-31; новость прямо связывает этот индекс с FixtureLoan-B-001.",
+                    "predicate": "Указанное изменение индекса вступает в силу 2027-01-01 и относится к индексу по контракту.",
+                    "status": "supported",
+                    "sourceRefs": [
+                      {
+                        "materialId": "synthetic-quality-20261025-fixedloan-b-001-news",
+                        "versionId": "v1",
+                        "contentHash": "7d4c696ac3a12894cf216fa42a3b9eea33c7d69bb7e7677d886e5e6921ebb677"
+                      }
+                    ],
+                    "id": "index_change",
+                    "assertion": "observed",
+                    "dependsOn": []
+                  },
+                  {
+                    "fact": "Дополнительный договорный расход по процентам за 2027 год относительно ставки 12% составляет RUB 20000.",
+                    "predicate": "Разность процентов за один и тот же период: principal × изменение ставки × 365/365; начисление простое, principal постоянен.",
+                    "status": "supported",
+                    "sourceRefs": [
+                      {
+                        "materialId": "synthetic-quality-20261025-fixedloan-b-001-news",
+                        "versionId": "v1",
+                        "contentHash": "7d4c696ac3a12894cf216fa42a3b9eea33c7d69bb7e7677d886e5e6921ebb677"
+                      },
+                      {
+                        "materialId": "synthetic-quality-20261025-fixedloan-b-001-contract",
+                        "versionId": "v1",
+                        "contentHash": "983432cead449b03429d94b5d4769f17c52c2f524489bc8cd6409aca14c1bc2a"
+                      }
+                    ],
+                    "id": "incremental_interest",
+                    "assertion": "derived",
+                    "dependsOn": [
+                      "loan_terms",
+                      "index_change"
+                    ]
+                  },
+                  {
+                    "fact": "Проценты за 2027 год предусмотрено выплатить единовременно 2027-12-31; источник не устанавливает факт фактической оплаты или поступления денег кредитору.",
+                    "predicate": "Контракт задаёт дату платежа процентов.",
+                    "status": "supported",
+                    "sourceRefs": [
+                      {
+                        "materialId": "synthetic-quality-20261025-fixedloan-b-001-contract",
+                        "versionId": "v1",
+                        "contentHash": "983432cead449b03429d94b5d4769f17c52c2f524489bc8cd6409aca14c1bc2a"
+                      }
+                    ],
+                    "id": "interest_due_date",
+                    "assertion": "observed",
+                    "dependsOn": []
+                  }
+                ],
+                "unknowns": [],
+                "applicability": {
+                  "status": "established",
+                  "basis": "documented_exposure",
+                  "explanation": "Документирован конкретный кредит FixtureLoan-B-001 компании с плавающей ставкой, равной индексу FixtureBench-A. Вывод относится только к этому займу и не является агрегатом по компании.",
+                  "sourceRefs": [
+                    {
+                      "materialId": "synthetic-quality-20261025-fixedloan-b-001-contract",
+                      "versionId": "v1",
+                      "contentHash": "983432cead449b03429d94b5d4769f17c52c2f524489bc8cd6409aca14c1bc2a"
+                    },
+                    {
+                      "materialId": "synthetic-quality-20261025-fixedloan-b-001-news",
+                      "versionId": "v1",
+                      "contentHash": "7d4c696ac3a12894cf216fa42a3b9eea33c7d69bb7e7677d886e5e6921ebb677"
+                    }
+                  ],
+                  "assumptions": []
+                }
+              },
+              "trigger": null,
+              "modelExplanation": "Новость сообщает рост именно FixtureBench-A с 12% до 14% с 2027-01-01. Для документированного FixtureLoan-B-001 это даёт за 2027 год дополнительный процентный расход RUB 20000 относительно договорного сценария, если ставка оставалась бы 12%: новая сумма процентов по контракту RUB 140000, исходная RUB 120000. Это сумма договорного начисления за год, а не доказательство фактического платежа. Контракт предусматривает единовременную оплату 2027-12-31. Вывод касается только этого займа; полной совокупной экспозиции компании источники не устанавливают.",
+              "publicationClass": "consequence"
+            }
+          }
+        ],
+        "contextComplete": true,
+        "unrevisedEffectIds": [],
+        "retrievalTrace": [
+          {
+            "round": 0,
+            "queries": [],
+            "retrievedSources": [
+              {
+                "materialId": "synthetic-quality-20261025-fixedloan-b-001-news",
+                "versionId": "v1",
+                "contentHash": "7d4c696ac3a12894cf216fa42a3b9eea33c7d69bb7e7677d886e5e6921ebb677"
+              },
+              {
+                "materialId": "synthetic-quality-20261025-fixedloan-b-001-contract",
+                "versionId": "v1",
+                "contentHash": "983432cead449b03429d94b5d4769f17c52c2f524489bc8cd6409aca14c1bc2a"
+              },
+              {
+                "materialId": "synthetic-release-20261024T182913Z-loan-b",
+                "versionId": "v1",
+                "contentHash": "4df21f510ecf2feba7bfe9f1a09119960acda94e027dd4b69e34d133acfc61b1"
+              }
+            ],
+            "stopReason": "agent_tools"
+          }
+        ],
+        "trigger": null
+      }
+    },
+    {
+      "request": {
+        "asOf": "2026-10-25T11:50:21.173278Z",
+        "companyId": "9d2ad610-eeb7-48e9-a6dc-50081bf61341",
+        "newsMaterialId": "synthetic-quality-20261025-unknownindex-b-002-news",
+        "newsVersionId": "v1",
+        "drafts": [
+          {
+            "conclusion": "Новость сообщает об изменении FixtureBench-Z, но не пересматривает известное последствие по FixtureLoan-B-001: его ставка связана с FixtureBench-A. Известный второй материал о займе также не устанавливает связь с FixtureBench-Z. Возможное влияние на другие обязательства остаётся неизвестным; поэтому нельзя рассчитать изменение расхода или объявить его нулевым. Новость сообщает об индексе, а не о начислении или оплате процентов.",
+            "status": "unknown",
+            "impact": {
+              "metric": "expense_delta",
+              "amountBasis": "unknown",
+              "economicObjectId": null,
+              "evidenceStatus": "unknown",
+              "importance": 2,
+              "urgency": 1,
+              "novelty": 3
+            },
+            "effectKey": "draft-0",
+            "literalObjectRef": "company:9d2ad610-eeb7-48e9-a6dc-50081bf61341",
+            "question": {
+              "mechanism": "financing_cost",
+              "frame": "absolute",
+              "unit": "RUB",
+              "targetPeriod": "2027",
+              "baselinePeriod": "unknown",
+              "basis": "annual_run_rate"
+            },
+            "assessment": {
+              "unknowns": [
+                {
+                  "id": "fixturebenchz_obligations",
+                  "fact": "Неизвестно, есть ли у компании обязательства, ставка которых договорно привязана к FixtureBench-Z, и каковы их суммы и условия пересмотра.",
+                  "query": "Найдите действующие договоры компании с процентной ставкой, прямо привязанной к FixtureBench-Z; укажите principal, срок, формулу ставки и даты пересмотра.",
+                  "scope": "company",
+                  "materialId": null
+                }
+              ],
+              "conditions": [
+                {
+                  "id": "news_change",
+                  "assertion": "observed",
+                  "dependsOn": [],
+                  "fact": "Издатель FixtureBench-Z объявил изменение годового значения с 10% до 12% с 2027-01-01 по 2027-12-31.",
+                  "predicate": "Объявление относится к FixtureBench-Z и задаёт указанные ставку и период.",
+                  "status": "supported",
+                  "sourceRefs": [
+                    {
+                      "materialId": "synthetic-quality-20261025-unknownindex-b-002-news",
+                      "versionId": "v1",
+                      "contentHash": "68ba3f4a4c62ae5001dfd7db505dd594ccbc46e786cec42547cd80f82d3741fb"
+                    }
+                  ]
+                },
+                {
+                  "id": "known_contract_index",
+                  "assertion": "observed",
+                  "dependsOn": [],
+                  "fact": "Договор FixtureLoan-B-001 задаёт ставку, равную FixtureBench-A, без маржи, с немедленным пересмотром при изменении именно FixtureBench-A.",
+                  "predicate": "Документированная формула ставки этого займа ссылается на FixtureBench-A, а не FixtureBench-Z.",
+                  "status": "supported",
+                  "sourceRefs": [
+                    {
+                      "materialId": "synthetic-quality-20261025-fixedloan-b-001-contract",
+                      "versionId": "v1",
+                      "contentHash": "983432cead449b03429d94b5d4769f17c52c2f524489bc8cd6409aca14c1bc2a"
+                    }
+                  ]
+                },
+                {
+                  "id": "other_index_exposure",
+                  "assertion": "derived",
+                  "dependsOn": [
+                    "news_change"
+                  ],
+                  "fact": "Применимость объявления FixtureBench-Z к иным обязательствам компании не установлена.",
+                  "predicate": "Объявление само по себе не идентифицирует договор компании, привязанный к FixtureBench-Z.",
+                  "status": "supported",
+                  "sourceRefs": [
+                    {
+                      "materialId": "synthetic-quality-20261025-unknownindex-b-002-news",
+                      "versionId": "v1",
+                      "contentHash": "68ba3f4a4c62ae5001dfd7db505dd594ccbc46e786cec42547cd80f82d3741fb"
+                    }
+                  ]
+                }
+              ],
+              "applicability": {
+                "status": "unknown",
+                "basis": "not_established",
+                "explanation": "Документированное обязательство FixtureLoan-B-001 привязано к FixtureBench-A, а не к FixtureBench-Z. Известный второй материал о займе также не указывает FixtureBench-Z. Это не устанавливает и не исключает иные обязательства компании, привязанные к FixtureBench-Z; предоставленная полнота retrieval по имеющимся материалам не доказывает отсутствие такой экспозиции.",
+                "assumptions": [],
+                "sourceRefs": [
+                  {
+                    "materialId": "synthetic-quality-20261025-unknownindex-b-002-news",
+                    "versionId": "v1",
+                    "contentHash": "68ba3f4a4c62ae5001dfd7db505dd594ccbc46e786cec42547cd80f82d3741fb"
+                  },
+                  {
+                    "materialId": "synthetic-quality-20261025-fixedloan-b-001-contract",
+                    "versionId": "v1",
+                    "contentHash": "983432cead449b03429d94b5d4769f17c52c2f524489bc8cd6409aca14c1bc2a"
+                  },
+                  {
+                    "materialId": "synthetic-release-20261024T182913Z-loan-b",
+                    "versionId": "v1",
+                    "contentHash": "4df21f510ecf2feba7bfe9f1a09119960acda94e027dd4b69e34d133acfc61b1"
+                  }
+                ]
+              }
+            },
+            "sourceRefs": [
+              {
+                "materialId": "synthetic-quality-20261025-unknownindex-b-002-news",
+                "versionId": "v1",
+                "contentHash": "68ba3f4a4c62ae5001dfd7db505dd594ccbc46e786cec42547cd80f82d3741fb"
+              },
+              {
+                "materialId": "synthetic-quality-20261025-fixedloan-b-001-contract",
+                "versionId": "v1",
+                "contentHash": "983432cead449b03429d94b5d4769f17c52c2f524489bc8cd6409aca14c1bc2a"
+              },
+              {
+                "materialId": "synthetic-release-20261024T182913Z-loan-b",
+                "versionId": "v1",
+                "contentHash": "4df21f510ecf2feba7bfe9f1a09119960acda94e027dd4b69e34d133acfc61b1"
+              }
+            ],
+            "expectedPreviousRevisionId": "revision_e2a61c78758d4b05ba3709a448c0b707"
+          }
+        ]
+      },
+      "materials": [
+        {
+          "materialId": "synthetic-quality-20261025-unknownindex-b-002-news",
+          "versionId": "v1",
+          "sourceId": "synthetic-quality-once",
+          "kind": "news",
+          "title": "Invented FixtureBench-Z rate announcement",
+          "text": "SYNTHETIC INVENTED NEWS ONLY. The publisher of the named index FixtureBench-Z announces that its annual value changes from 10 percent to 12 percent effective 2027-01-01T00:00:00Z and remains 12 percent through 2027-12-31. The announcement concerns FixtureBench-Z. It contains no company names, loan identifiers or borrower contracts.",
+          "knownAt": "2026-10-25T11:45:53.128625+00:00",
+          "publishedAt": null,
+          "correctsVersionId": null,
+          "companyIds": [
+            "9d2ad610-eeb7-48e9-a6dc-50081bf61341"
+          ],
+          "bankProfileIds": [],
+          "contentHash": "68ba3f4a4c62ae5001dfd7db505dd594ccbc46e786cec42547cd80f82d3741fb"
+        },
+        {
+          "materialId": "synthetic-quality-20261025-fixedloan-b-001-contract",
+          "versionId": "v1",
+          "sourceId": "synthetic-quality-once",
+          "kind": "company",
+          "title": "Invented FixtureLoan-B-001 complete annual terms",
+          "text": "SYNTHETIC INVENTED TEST ONLY. This document concerns only loan FixtureLoan-B-001 held by the invented Company B. Principal is RUB 1000000 and is constant for every one of the 365 calendar days from 2027-01-01 through 2027-12-31 inclusive. Its contractual annual simple interest rate equals exactly the named index FixtureBench-A, with zero margin, no floor or cap, no compounding, fees, taxes, repayments or hedges. Before the announced change the index and contract rate are 12 percent per annum. The contract resets immediately on the effective date of any change to FixtureBench-A. Day count is Actual/365 Fixed; 2027 has exactly 365 interest-accrual days for this test. All interest for those365 days is paid once at the end of 2027-12-31. Principal and all other terms remain unchanged. This is one specific invented loan, not a claim about all obligations of the company. FixtureLoan-B-001 is distinct from the older invented contract material; this document neither replaces nor corrects that earlier loan. Consequences for this new loan must be assessed separately; no aggregate company-wide total is asserted.",
+          "knownAt": "2026-10-25T11:17:57.594156+00:00",
+          "publishedAt": null,
+          "correctsVersionId": null,
+          "companyIds": [
+            "9d2ad610-eeb7-48e9-a6dc-50081bf61341"
+          ],
+          "bankProfileIds": [],
+          "contentHash": "983432cead449b03429d94b5d4769f17c52c2f524489bc8cd6409aca14c1bc2a"
+        },
+        {
+          "materialId": "synthetic-release-20261024T182913Z-loan-b",
+          "versionId": "v1",
+          "sourceId": "synthetic-smoke",
+          "kind": "company",
+          "title": "Invented floating-rate contract B",
+          "text": "SYNTHETIC FIXTURE. Company B has a RUB 1000000 floating-rate loan, constant principal for one synthetic year. Annual interest equals reference rate plus 2 percentage points. Reference rate was 10 percent and resets immediately. No fees or hedges assumed.",
+          "knownAt": "2026-10-24T18:29:39.684568+00:00",
+          "publishedAt": null,
+          "correctsVersionId": null,
+          "companyIds": [
+            "9d2ad610-eeb7-48e9-a6dc-50081bf61341"
+          ],
+          "bankProfileIds": [],
+          "contentHash": "4df21f510ecf2feba7bfe9f1a09119960acda94e027dd4b69e34d133acfc61b1"
+        }
+      ],
+      "receipt": {
+        "analysisId": "analysis_5d9ff97d7cb7eb48d8aa94c7627b0bfa0a0c67f0b248f45256d8f9d88d4c8952",
+        "companyId": "9d2ad610-eeb7-48e9-a6dc-50081bf61341",
+        "bankProfileId": null,
+        "newsMaterialId": "synthetic-quality-20261025-unknownindex-b-002-news",
+        "newsVersionId": "v1",
+        "asOf": "2026-10-25T11:50:21.173278+00:00",
+        "completedAt": "2026-10-25T11:51:18.499452+00:00",
+        "duplicate": false,
+        "resultSemantics": "saved_analysis_revisions_not_latest_heads",
+        "effects": [
+          {
+            "effectId": "question_1f2c5a3ef74f6e68afaa99fb6c018a4cd1a60eb33763b29379d5307c0e7be3a3",
+            "revisionId": "revision_664c21fef8314866b26dfbcab76ddeda",
+            "previousRevisionId": "revision_e2a61c78758d4b05ba3709a448c0b707",
+            "duplicate": false,
+            "currentRevision": {
+              "revisionId": "revision_664c21fef8314866b26dfbcab76ddeda",
+              "previousRevisionId": "revision_e2a61c78758d4b05ba3709a448c0b707",
+              "newsVersionId": "v1",
+              "asOf": "2026-10-25T11:50:21.173278+00:00",
+              "conclusion": "Новость сообщает об изменении FixtureBench-Z, но не пересматривает известное последствие по FixtureLoan-B-001: его ставка связана с FixtureBench-A. Известный второй материал о займе также не устанавливает связь с FixtureBench-Z. Возможное влияние на другие обязательства остаётся неизвестным; поэтому нельзя рассчитать изменение расхода или объявить его нулевым. Новость сообщает об индексе, а не о начислении или оплате процентов.",
+              "status": "unknown",
+              "sourceRefs": [
+                {
+                  "materialId": "synthetic-quality-20261025-fixedloan-b-001-contract",
+                  "versionId": "v1",
+                  "contentHash": "983432cead449b03429d94b5d4769f17c52c2f524489bc8cd6409aca14c1bc2a"
+                },
+                {
+                  "materialId": "synthetic-quality-20261025-unknownindex-b-002-news",
+                  "versionId": "v1",
+                  "contentHash": "68ba3f4a4c62ae5001dfd7db505dd594ccbc46e786cec42547cd80f82d3741fb"
+                },
+                {
+                  "materialId": "synthetic-release-20261024T182913Z-loan-b",
+                  "versionId": "v1",
+                  "contentHash": "4df21f510ecf2feba7bfe9f1a09119960acda94e027dd4b69e34d133acfc61b1"
+                }
+              ],
+              "calculation": null,
+              "calculationResult": null,
+              "calculationArithmeticOnly": null,
+              "createdAt": "2026-10-25T11:51:18.499452+00:00",
+              "impact": {
+                "metric": "expense_delta",
+                "amountBasis": "unknown",
+                "economicObjectId": null,
+                "evidenceStatus": "unknown",
+                "importance": 2,
+                "urgency": 1,
+                "novelty": 3
+              },
+              "newsMaterialId": "synthetic-quality-20261025-unknownindex-b-002-news",
+              "question": {
+                "mechanism": "financing_cost",
+                "frame": "absolute",
+                "unit": "RUB",
+                "targetPeriod": "2027",
+                "baselinePeriod": "unknown",
+                "basis": "annual_run_rate"
+              },
+              "assessment": {
+                "conditions": [
+                  {
+                    "fact": "Издатель FixtureBench-Z объявил изменение годового значения с 10% до 12% с 2027-01-01 по 2027-12-31.",
+                    "predicate": "Объявление относится к FixtureBench-Z и задаёт указанные ставку и период.",
+                    "status": "supported",
+                    "sourceRefs": [
+                      {
+                        "materialId": "synthetic-quality-20261025-unknownindex-b-002-news",
+                        "versionId": "v1",
+                        "contentHash": "68ba3f4a4c62ae5001dfd7db505dd594ccbc46e786cec42547cd80f82d3741fb"
+                      }
+                    ],
+                    "id": "news_change",
+                    "assertion": "observed",
+                    "dependsOn": []
+                  },
+                  {
+                    "fact": "Договор FixtureLoan-B-001 задаёт ставку, равную FixtureBench-A, без маржи, с немедленным пересмотром при изменении именно FixtureBench-A.",
+                    "predicate": "Документированная формула ставки этого займа ссылается на FixtureBench-A, а не FixtureBench-Z.",
+                    "status": "supported",
+                    "sourceRefs": [
+                      {
+                        "materialId": "synthetic-quality-20261025-fixedloan-b-001-contract",
+                        "versionId": "v1",
+                        "contentHash": "983432cead449b03429d94b5d4769f17c52c2f524489bc8cd6409aca14c1bc2a"
+                      }
+                    ],
+                    "id": "known_contract_index",
+                    "assertion": "observed",
+                    "dependsOn": []
+                  },
+                  {
+                    "fact": "Применимость объявления FixtureBench-Z к иным обязательствам компании не установлена.",
+                    "predicate": "Объявление само по себе не идентифицирует договор компании, привязанный к FixtureBench-Z.",
+                    "status": "supported",
+                    "sourceRefs": [
+                      {
+                        "materialId": "synthetic-quality-20261025-unknownindex-b-002-news",
+                        "versionId": "v1",
+                        "contentHash": "68ba3f4a4c62ae5001dfd7db505dd594ccbc46e786cec42547cd80f82d3741fb"
+                      }
+                    ],
+                    "id": "other_index_exposure",
+                    "assertion": "derived",
+                    "dependsOn": [
+                      "news_change"
+                    ]
+                  }
+                ],
+                "unknowns": [
+                  {
+                    "fact": "Неизвестно, есть ли у компании обязательства, ставка которых договорно привязана к FixtureBench-Z, и каковы их суммы и условия пересмотра.",
+                    "query": "Найдите действующие договоры компании с процентной ставкой, прямо привязанной к FixtureBench-Z; укажите principal, срок, формулу ставки и даты пересмотра.",
+                    "scope": "company",
+                    "materialId": null,
+                    "id": "fixturebenchz_obligations"
+                  }
+                ],
+                "applicability": {
+                  "status": "unknown",
+                  "basis": "not_established",
+                  "explanation": "Документированное обязательство FixtureLoan-B-001 привязано к FixtureBench-A, а не к FixtureBench-Z. Известный второй материал о займе также не указывает FixtureBench-Z. Это не устанавливает и не исключает иные обязательства компании, привязанные к FixtureBench-Z; предоставленная полнота retrieval по имеющимся материалам не доказывает отсутствие такой экспозиции.",
+                  "sourceRefs": [
+                    {
+                      "materialId": "synthetic-quality-20261025-unknownindex-b-002-news",
+                      "versionId": "v1",
+                      "contentHash": "68ba3f4a4c62ae5001dfd7db505dd594ccbc46e786cec42547cd80f82d3741fb"
+                    },
+                    {
+                      "materialId": "synthetic-quality-20261025-fixedloan-b-001-contract",
+                      "versionId": "v1",
+                      "contentHash": "983432cead449b03429d94b5d4769f17c52c2f524489bc8cd6409aca14c1bc2a"
+                    },
+                    {
+                      "materialId": "synthetic-release-20261024T182913Z-loan-b",
+                      "versionId": "v1",
+                      "contentHash": "4df21f510ecf2feba7bfe9f1a09119960acda94e027dd4b69e34d133acfc61b1"
+                    }
+                  ],
+                  "assumptions": []
+                }
+              },
+              "trigger": null,
+              "modelExplanation": null,
+              "publicationClass": "missing_data"
+            }
+          }
+        ],
+        "contextComplete": true,
+        "unrevisedEffectIds": [],
+        "retrievalTrace": [
+          {
+            "round": 0,
+            "queries": [],
+            "retrievedSources": [
+              {
+                "materialId": "synthetic-quality-20261025-unknownindex-b-002-news",
+                "versionId": "v1",
+                "contentHash": "68ba3f4a4c62ae5001dfd7db505dd594ccbc46e786cec42547cd80f82d3741fb"
+              },
+              {
+                "materialId": "synthetic-quality-20261025-fixedloan-b-001-contract",
+                "versionId": "v1",
+                "contentHash": "983432cead449b03429d94b5d4769f17c52c2f524489bc8cd6409aca14c1bc2a"
+              },
+              {
+                "materialId": "synthetic-release-20261024T182913Z-loan-b",
+                "versionId": "v1",
+                "contentHash": "4df21f510ecf2feba7bfe9f1a09119960acda94e027dd4b69e34d133acfc61b1"
+              }
+            ],
+            "stopReason": "agent_tools"
+          }
+        ],
+        "trigger": null
+      }
+    }
+  ]
+}

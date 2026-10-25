@@ -296,6 +296,16 @@ public sealed class AnalysisService(IEffectRepository repository, ISourceResolve
                     return new(new Error("An unprocessed historical event cannot replace a more recent assessment; reassess at current knowledge time.", ErrorSource.Client, ErrorType.CorruptedInfo) { HttpStatusCode = HttpStatusCode.Conflict });
                 }
 
+                var scope = await ReassessmentScopePolicy.IsIndependentUnknown(normalized, draft, existing, Material);
+                if (scope.Error is { } scopeError)
+                {
+                    return new(scopeError);
+                }
+                if (scope.Content)
+                {
+                    return new(new Error("An independent unknown requires its own reassessment scope; it cannot replace an identified consequence without an object binding or a correction of its news or dependencies.", ErrorSource.Client, ErrorType.CorruptedInfo) { HttpStatusCode = HttpStatusCode.UnprocessableEntity });
+                }
+
                 if (trigger is not null)
                 {
                     continue;
