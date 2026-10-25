@@ -121,6 +121,11 @@ internal static class AnalysisRequestNormalizer
                 return new(new Error("A bounded literal object, conclusion, status and 1-64 source references are required.", ErrorSource.Client, ErrorType.CorruptedInfo) { HttpStatusCode = HttpStatusCode.BadRequest });
             }
 
+            if (CompanyImportancePolicy.ShapeError(draft) is { } importanceError)
+            {
+                return new(importanceError);
+            }
+
             if (draft.ModelExplanation?.Length > 16000)
             {
                 return new(new Error("Raw model explanation must be bounded.", ErrorSource.Client, ErrorType.CorruptedInfo) { HttpStatusCode = HttpStatusCode.BadRequest });
@@ -226,6 +231,12 @@ internal static class AnalysisRequestNormalizer
                 EffectKey = stableKey,
                 Question = question,
                 SourceRefs = references,
+                CompanyImportance = draft.CompanyImportance is { } importance ? importance with
+                {
+                    Rationale = importance.Rationale.Trim(),
+                    EvidenceRefs = importance.EvidenceRefs.Select(s => s with { ContentHash = s.ContentHash.ToLowerInvariant() })
+                        .Distinct().OrderBy(s => s.MaterialId, StringComparer.Ordinal).ThenBy(s => s.VersionId, StringComparer.Ordinal).ThenBy(s => s.ContentHash, StringComparer.Ordinal).ToArray()
+                } : null,
                 Calculation = calculation
             };
             if (draft.Question is not null &&

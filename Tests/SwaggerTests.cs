@@ -49,6 +49,26 @@ public sealed class SwaggerTests
         Assert.Equal("X-Internal-Secret", security.GetProperty("name").GetString());
         Assert.DoesNotContain("synthetic-docs-test-only", root.GetRawText(), StringComparison.Ordinal);
         Assert.True(operation.GetProperty("responses").GetProperty("200").TryGetProperty("content", out _));
+        foreach (var suffix in new[] { "personal", "personal/{id}", "personal/{id}/history", "general", "general/{id}" })
+        {
+            var read = root.GetProperty("paths").GetProperty("/insight-service/internal/read/companies/{companyId}/" + suffix).GetProperty("get");
+            Assert.True(read.GetProperty("security")[0].TryGetProperty("InternalSecret", out _));
+            Assert.True(read.GetProperty("responses").GetProperty("200").TryGetProperty("content", out _));
+        }
+        var readSchemas = root.GetProperty("components").GetProperty("schemas");
+        var personalRead = readSchemas.GetProperty("PersonalInsightRead").GetProperty("properties");
+        Assert.True(personalRead.TryGetProperty("currentRevision", out _));
+        Assert.True(personalRead.TryGetProperty("requiresReassessment", out _));
+        Assert.False(personalRead.TryGetProperty("history", out _));
+        var generalRead = readSchemas.GetProperty("GeneralInsightRead").GetProperty("properties");
+        Assert.True(generalRead.TryGetProperty("insight", out _));
+        Assert.False(generalRead.TryGetProperty("checkpoint", out _));
+        var importance = root.GetProperty("components").GetProperty("schemas").GetProperty("CompanyImportance");
+        var score = importance.GetProperty("properties").GetProperty("score");
+        Assert.Equal(1, score.GetProperty("minimum").GetInt32());
+        Assert.Equal(5, score.GetProperty("maximum").GetInt32());
+        Assert.True(score.GetProperty("nullable").GetBoolean());
+        Assert.Equal(4, importance.GetProperty("example").GetProperty("score").GetInt32());
         using var ui = await client.GetAsync("/insight-service/swagger/index.html");
         Assert.Equal(HttpStatusCode.OK, ui.StatusCode);
         using var asset = await client.GetAsync("/insight-service/swagger/swagger-ui-bundle.js");

@@ -180,6 +180,19 @@ public sealed class AnalysisPreparationService(
         var drafts = new List<EffectDraft>();
         foreach (var draft in input.Drafts)
         {
+            var importance = await CompanyImportancePolicy.Validate(draft, request.CompanyId, async (materialId, versionId) =>
+            {
+                var resolved = await sources.GetAsync(materialId, versionId, CancellationToken.None);
+                if (resolved.Error is not null)
+                {
+                    return resolved;
+                }
+                return resolved.Content!.KnownAt > request.AsOf ? new(Invalid()) : resolved;
+            });
+            if (importance.Error is { } importanceError)
+            {
+                return new(importanceError);
+            }
             var prepared = draft;
             if (draft.Question is { } question)
             {

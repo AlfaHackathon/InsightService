@@ -9,4 +9,5 @@ public sealed record EffectDraft(string EffectKey, string LiteralObjectRef, stri
     string Conclusion, string Status, SourceRef[] SourceRefs, Calculation? Calculation = null, ImpactMetadata? Impact = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] QuestionIdentity? Question = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] QuestionAssessment? Assessment = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ModelExplanation = null);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ModelExplanation = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] CompanyImportance? CompanyImportance = null);

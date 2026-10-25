@@ -13,7 +13,7 @@ public static class SwaggerRegistration
             {
                 Title = "InsightService internal API",
                 Version = "v1",
-                Description = "Service-to-service API. Documentation does not grant access. No public user insight/source facade is implemented. Never place an internal credential in frontend code."
+                Description = "Service-to-service API. Documentation does not grant access. This service exposes internal routes; the client-facing current-company read facade belongs to AgentService. Never place an internal credential in frontend code."
             });
             options.AddSecurityDefinition("InternalSecret", new OpenApiSecurityScheme
             {
@@ -23,6 +23,7 @@ public static class SwaggerRegistration
                 Description = "Configured service credential; user Bearer tokens do not authorize internal routes."
             });
             options.OperationFilter<InternalSwaggerOperationFilter>();
+            options.SchemaFilter<CompanyImportanceSchemaFilter>();
         });
         return services;
     }

@@ -12,6 +12,11 @@ public static class ApplicabilityPolicy
     public static async Task<Result> Validate(EffectDraft draft, Guid company, Func<string, string, Task<Result<MaterialVersion>>> material,
         bool validateFinancialSemantics = true)
     {
+        var importance = await CompanyImportancePolicy.Validate(draft, company, material);
+        if (importance.Error is { } importanceError)
+        {
+            return new(importanceError);
+        }
         var hasDependencies = draft.Assessment?.Conditions?.Any(c => c is not null &&
             (c.Id is not null || c.Assertion is not null || c.DependsOn is not null)) == true ||
             draft.Assessment?.Unknowns?.Any(u => u?.Id is not null) == true;

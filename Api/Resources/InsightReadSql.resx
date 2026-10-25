@@ -1,0 +1,110 @@
+<?xml version='1.0' encoding='utf-8'?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <data name="ReadTransaction" xml:space="preserve">
+    <value>SET TRANSACTION READ ONLY; SET LOCAL statement_timeout='2000ms';</value>
+  </data>
+  <data name="PersonalPage" xml:space="preserve">
+    <value>WITH current_heads AS (
+ SELECT h.effect_id,h.company_id,h.news_material_id,h.literal_object_ref,r.payload_json::jsonb AS revision
+ FROM questions h JOIN question_revisions r ON r.revision_id=h.current_revision_id WHERE h.company_id=@company
+ UNION ALL
+ SELECT h.effect_id,h.company_id,h.news_material_id,h.literal_object_ref,r.payload_json::jsonb AS revision
+ FROM effects h JOIN effect_revisions r ON r.revision_id=h.current_revision_id WHERE h.company_id=@company
+), scoped AS (
+ SELECT h.*,insight_utc_ticks(h.revision-&gt;&gt;'createdAt') AS order_ticks,
+ COALESCE(NULLIF(h.revision-&gt;&gt;'newsMaterialId',''),h.news_material_id) AS current_news,
+ EXISTS(SELECT 1 FROM question_validity_events e WHERE e.effect_id=h.effect_id AND e.known_ticks&lt;=@now AND e.kind='invalidated'
+  AND NOT EXISTS(SELECT 1 FROM question_validity_events n WHERE n.effect_id=e.effect_id AND n.material_id=e.material_id AND n.known_ticks&lt;=@now
+   AND (n.known_ticks&gt;e.known_ticks OR (n.known_ticks=e.known_ticks AND n.event_id&gt;e.event_id)))) AS stale
+ FROM current_heads h
+)
+SELECT effect_id AS "Id",company_id::uuid AS "CompanyId",current_news AS "NewsMaterialId",literal_object_ref AS "LiteralObjectRef",
+ revision::text AS "RevisionJson",order_ticks AS "OrderTicks",stale AS "RequiresReassessment"
+FROM scoped
+WHERE (CAST(@status AS text) IS NULL OR revision-&gt;&gt;'status'=CAST(@status AS text))
+ AND (CAST(@mechanism AS text) IS NULL OR revision#&gt;&gt;'{question,mechanism}'=CAST(@mechanism AS text))
+ AND (CAST(@news AS text) IS NULL OR current_news=CAST(@news AS text))
+ AND (CAST(@importance AS integer) IS NULL OR (revision#&gt;&gt;'{companyImportance,score}')::integer&gt;=CAST(@importance AS integer))
+ AND (CAST(@after AS bigint) IS NULL OR (order_ticks,effect_id COLLATE "C")&lt;(CAST(@after AS bigint),CAST(@id AS text) COLLATE "C"))
+ORDER BY order_ticks DESC,effect_id COLLATE "C" DESC LIMIT @take</value>
+  </data>
+  <data name="PersonalDetail" xml:space="preserve">
+    <value>WITH current_heads AS (
+ SELECT h.effect_id,h.company_id,h.news_material_id,h.literal_object_ref,r.payload_json::jsonb AS revision
+ FROM questions h JOIN question_revisions r ON r.revision_id=h.current_revision_id WHERE h.company_id=@company
+ UNION ALL
+ SELECT h.effect_id,h.company_id,h.news_material_id,h.literal_object_ref,r.payload_json::jsonb AS revision
+ FROM effects h JOIN effect_revisions r ON r.revision_id=h.current_revision_id WHERE h.company_id=@company
+), scoped AS (
+ SELECT h.*,insight_utc_ticks(h.revision-&gt;&gt;'createdAt') AS order_ticks,
+ COALESCE(NULLIF(h.revision-&gt;&gt;'newsMaterialId',''),h.news_material_id) AS current_news,
+ EXISTS(SELECT 1 FROM question_validity_events e WHERE e.effect_id=h.effect_id AND e.known_ticks&lt;=@now AND e.kind='invalidated'
+  AND NOT EXISTS(SELECT 1 FROM question_validity_events n WHERE n.effect_id=e.effect_id AND n.material_id=e.material_id AND n.known_ticks&lt;=@now
+   AND (n.known_ticks&gt;e.known_ticks OR (n.known_ticks=e.known_ticks AND n.event_id&gt;e.event_id)))) AS stale
+ FROM current_heads h
+)
+SELECT effect_id AS "Id",company_id::uuid AS "CompanyId",current_news AS "NewsMaterialId",literal_object_ref AS "LiteralObjectRef",
+ revision::text AS "RevisionJson",order_ticks AS "OrderTicks",stale AS "RequiresReassessment"
+FROM scoped
+WHERE effect_id=@id LIMIT 1</value>
+  </data>
+  <data name="PersonalHistory" xml:space="preserve">
+    <value>WITH history AS (
+ SELECT r.sequence,r.payload_json FROM question_revisions r JOIN questions h ON h.effect_id=r.effect_id
+ WHERE h.company_id=@company AND h.effect_id=@id
+ UNION ALL
+ SELECT r.sequence,r.payload_json FROM effect_revisions r JOIN effects h ON h.effect_id=r.effect_id
+ WHERE h.company_id=@company AND h.effect_id=@id
+)
+SELECT sequence AS "Sequence",payload_json AS "RevisionJson" FROM history
+WHERE CAST(@after AS bigint) IS NULL OR sequence&lt;CAST(@after AS bigint)
+ORDER BY sequence DESC LIMIT @take</value>
+  </data>
+  <data name="GeneralPage" xml:space="preserve">
+    <value>WITH eligible AS (
+ SELECT job_id,updated_ticks,payload::jsonb AS document FROM news_jobs
+ WHERE status IN ('completed','partial')
+ AND COALESCE(payload::jsonb#&gt;'{checkpoint,selectedCompanyIds}','[]'::jsonb) @&gt; jsonb_build_array(CAST(@company AS text))
+ AND jsonb_typeof(payload::jsonb#&gt;'{checkpoint,result,generalInsights}')='array'
+), latest AS (
+ SELECT DISTINCT ON (document#&gt;&gt;'{request,newsMaterialId}',document#&gt;&gt;'{request,newsVersionId}') * FROM eligible
+ ORDER BY document#&gt;&gt;'{request,newsMaterialId}',document#&gt;&gt;'{request,newsVersionId}',updated_ticks DESC,job_id COLLATE "C" DESC
+), expanded AS (
+ SELECT j.*,g.value AS insight,(g.ordinality-1)::integer AS insight_index FROM latest j
+ CROSS JOIN LATERAL jsonb_array_elements(j.document#&gt;'{checkpoint,result,generalInsights}') WITH ORDINALITY g(value,ordinality)
+)
+SELECT job_id AS "JobId",insight_index AS "InsightIndex",updated_ticks AS "OrderTicks",
+ document#&gt;&gt;'{request,newsMaterialId}' AS "NewsMaterialId",document#&gt;&gt;'{request,newsVersionId}' AS "NewsVersionId",
+ document#&gt;&gt;'{request,asOf}' AS "AsOf",document-&gt;&gt;'updatedAt' AS "UpdatedAt",
+ COALESCE(document#&gt;&gt;'{request,parameters,textCompleteness}','unknown') AS "TextCompleteness",
+ COALESCE((SELECT c-&gt;&gt;'status' FROM jsonb_array_elements(COALESCE(document#&gt;'{checkpoint,companies}','[]'::jsonb)) c WHERE c-&gt;&gt;'companyId'=@company LIMIT 1),'pending') AS "CompanyStatus",
+ insight::text AS "InsightJson" FROM expanded
+WHERE (CAST(@news AS text) IS NULL OR document#&gt;&gt;'{request,newsMaterialId}'=CAST(@news AS text))
+ AND (CAST(@after AS bigint) IS NULL OR (updated_ticks,job_id COLLATE "C",insight_index)&lt;(CAST(@after AS bigint),CAST(@id AS text) COLLATE "C",CAST(@index AS integer)))
+ORDER BY updated_ticks DESC,job_id COLLATE "C" DESC,insight_index DESC LIMIT @take</value>
+  </data>
+  <data name="GeneralDetail" xml:space="preserve">
+    <value>WITH eligible AS (
+ SELECT job_id,updated_ticks,payload::jsonb AS document FROM news_jobs
+ WHERE status IN ('completed','partial')
+ AND COALESCE(payload::jsonb#&gt;'{checkpoint,selectedCompanyIds}','[]'::jsonb) @&gt; jsonb_build_array(CAST(@company AS text))
+ AND jsonb_typeof(payload::jsonb#&gt;'{checkpoint,result,generalInsights}')='array'
+), expanded AS (
+ SELECT j.*,g.value AS insight,(g.ordinality-1)::integer AS insight_index FROM eligible j
+ CROSS JOIN LATERAL jsonb_array_elements(j.document#&gt;'{checkpoint,result,generalInsights}') WITH ORDINALITY g(value,ordinality)
+)
+SELECT job_id AS "JobId",insight_index AS "InsightIndex",updated_ticks AS "OrderTicks",
+ document#&gt;&gt;'{request,newsMaterialId}' AS "NewsMaterialId",document#&gt;&gt;'{request,newsVersionId}' AS "NewsVersionId",
+ document#&gt;&gt;'{request,asOf}' AS "AsOf",document-&gt;&gt;'updatedAt' AS "UpdatedAt",
+ COALESCE(document#&gt;&gt;'{request,parameters,textCompleteness}','unknown') AS "TextCompleteness",
+ COALESCE((SELECT c-&gt;&gt;'status' FROM jsonb_array_elements(COALESCE(document#&gt;'{checkpoint,companies}','[]'::jsonb)) c WHERE c-&gt;&gt;'companyId'=@company LIMIT 1),'pending') AS "CompanyStatus",
+ insight::text AS "InsightJson" FROM expanded
+WHERE job_id=@id AND insight_index=@index LIMIT 1</value>
+  </data>
+</root>
