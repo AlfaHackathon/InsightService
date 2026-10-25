@@ -205,6 +205,22 @@ public sealed class AnalysisPreparationService(
                 return new(Invalid());
             }
 
+            if (existing is not null)
+            {
+                var scope = await ReassessmentScopePolicy.IsIndependentUnknown(request, prepared, existing,
+                    (materialId, versionId) => sources.GetAsync(materialId, versionId, CancellationToken.None));
+                if (scope.Error is { } scopeError)
+                {
+                    return new(scopeError);
+                }
+                if (scope.Content)
+                {
+                    // Keep the established object head unrevised. An independently scoped
+                    // missing-data question may still be prepared in this same batch.
+                    continue;
+                }
+            }
+
             drafts.Add(prepared with
             {
                 ExpectedPreviousRevisionId = existing?.CurrentRevision.RevisionId

@@ -13,4 +13,4 @@
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2"><PrivateAssets>all</PrivateAssets></PackageReference>
     <ProjectReference Include="../Api/InsightService.Api.csproj" />
   </ItemGroup>
-<ItemGroup><None Update="Fixtures/*.sql" CopyToOutputDirectory="PreserveNewest" /></ItemGroup></Project>
+<ItemGroup><None Update="Fixtures/*.sql" CopyToOutputDirectory="PreserveNewest" /><None Update="Fixtures/*.json" CopyToOutputDirectory="PreserveNewest" /></ItemGroup></Project>
