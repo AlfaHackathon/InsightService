@@ -9,6 +9,7 @@ using AlfaHackaton.Result.Errors;
 using InsightService.Common;
 using InsightService.Contracts.NewsJobs;
 using InsightService.Models.Persistence;
+using InsightService.Models.Policies;
 using InsightService.Repositories.Interfaces;
 using InsightService.Repositories.Postgres;
 using InsightService.Resources;
@@ -125,11 +126,11 @@ public sealed class NewsJobRepository(IDapperContext context) : INewsJobReposito
             return new(workerIdError2);
         }
         if (update.Status is not ("running" or "partial" or "completed" or "failed") ||
-            update.Checkpoint.ValueKind != JsonValueKind.Object ||
+            !InsightCategoryPolicy.IsValidCheckpoint(update.Checkpoint) ||
             update.Checkpoint.GetRawText().Length > 4000000 ||
             update.Error?.Length > 2000)
         {
-            return new(new Error("Status and bounded checkpoint/error are required.", ErrorSource.Client, ErrorType.CorruptedInfo) { HttpStatusCode = HttpStatusCode.BadRequest });
+            return new(new Error("Status, bounded checkpoint/error and a valid general insight category are required.", ErrorSource.Client, ErrorType.CorruptedInfo) { HttpStatusCode = HttpStatusCode.BadRequest });
         }
 
         using var transaction = await InsightTransaction.OpenAsync(context);

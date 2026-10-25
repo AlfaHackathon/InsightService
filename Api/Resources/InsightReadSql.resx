@@ -27,7 +27,8 @@
 SELECT effect_id AS "Id",company_id::uuid AS "CompanyId",current_news AS "NewsMaterialId",literal_object_ref AS "LiteralObjectRef",
  revision::text AS "RevisionJson",order_ticks AS "OrderTicks",stale AS "RequiresReassessment"
 FROM scoped
-WHERE (CAST(@status AS text) IS NULL OR revision-&gt;&gt;'status'=CAST(@status AS text))
+WHERE (CAST(@category AS text) IS NULL OR revision-&gt;&gt;'category'=CAST(@category AS text))
+ AND (CAST(@status AS text) IS NULL OR revision-&gt;&gt;'status'=CAST(@status AS text))
  AND (CAST(@mechanism AS text) IS NULL OR revision#&gt;&gt;'{question,mechanism}'=CAST(@mechanism AS text))
  AND (CAST(@news AS text) IS NULL OR current_news=CAST(@news AS text))
  AND (CAST(@importance AS integer) IS NULL OR (revision#&gt;&gt;'{companyImportance,score}')::integer&gt;=CAST(@importance AS integer))
@@ -85,7 +86,8 @@ SELECT job_id AS "JobId",insight_index AS "InsightIndex",updated_ticks AS "Order
  COALESCE(document#&gt;&gt;'{request,parameters,textCompleteness}','unknown') AS "TextCompleteness",
  COALESCE((SELECT c-&gt;&gt;'status' FROM jsonb_array_elements(COALESCE(document#&gt;'{checkpoint,companies}','[]'::jsonb)) c WHERE c-&gt;&gt;'companyId'=@company LIMIT 1),'pending') AS "CompanyStatus",
  insight::text AS "InsightJson" FROM expanded
-WHERE (CAST(@news AS text) IS NULL OR document#&gt;&gt;'{request,newsMaterialId}'=CAST(@news AS text))
+WHERE (CAST(@category AS text) IS NULL OR insight-&gt;&gt;'category'=CAST(@category AS text))
+ AND (CAST(@news AS text) IS NULL OR document#&gt;&gt;'{request,newsMaterialId}'=CAST(@news AS text))
  AND (CAST(@after AS bigint) IS NULL OR (updated_ticks,job_id COLLATE "C",insight_index)&lt;(CAST(@after AS bigint),CAST(@id AS text) COLLATE "C",CAST(@index AS integer)))
 ORDER BY updated_ticks DESC,job_id COLLATE "C" DESC,insight_index DESC LIMIT @take</value>
   </data>

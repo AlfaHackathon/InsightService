@@ -56,6 +56,12 @@ public sealed class SwaggerTests
             Assert.True(read.GetProperty("responses").GetProperty("200").TryGetProperty("content", out _));
         }
         var readSchemas = root.GetProperty("components").GetProperty("schemas");
+        foreach (var name in new[] { "EffectDraft", "EffectRevision" })
+        {
+            var category = readSchemas.GetProperty(name).GetProperty("properties").GetProperty("category");
+            Assert.True(category.GetProperty("nullable").GetBoolean());
+            Assert.Equal(new[] { "risk", "opportunity", "event" }, category.GetProperty("enum").EnumerateArray().Select(value => value.GetString()).ToArray());
+        }
         var personalRead = readSchemas.GetProperty("PersonalInsightRead").GetProperty("properties");
         Assert.True(personalRead.TryGetProperty("currentRevision", out _));
         Assert.True(personalRead.TryGetProperty("requiresReassessment", out _));
