@@ -1,5 +1,6 @@
 using System.Resources;
 namespace InsightService.Resources;
+
 internal static class InsightReadSql
 {
     private static readonly ResourceManager Manager = new("InsightService.Resources.InsightReadSql", typeof(InsightReadSql).Assembly);
