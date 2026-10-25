@@ -244,7 +244,7 @@ public sealed class ReassessmentScopePersistenceTests
             fixture.AddVersion(fixture.First.NewsMaterialId, "corrected", "v1");
             request = request with { NewsMaterialId = fixture.First.NewsMaterialId, NewsVersionId = "corrected" };
             var source = fixture.First.Drafts[0].SourceRefs.Single(r => r.MaterialId == fixture.First.NewsMaterialId);
-            draft = draft with { SourceRefs = [.. draft.SourceRefs.Where(r => r.MaterialId != fixture.Second.NewsMaterialId), source with { VersionId = "corrected" }] };
+            draft = draft with { SourceRefs = [.. draft.SourceRefs, source with { VersionId = "corrected" }] };
         }
         else
         {
@@ -364,7 +364,8 @@ public sealed class ReassessmentScopePersistenceTests
         };
         // A separate analysis uses another fixture-owned news version for the independent unknown.
         fixture.AddVersion(fixture.Second.NewsMaterialId, "independent-unknown");
-        var independent = request with { NewsVersionId = "independent-unknown", Drafts = [unknown with { SourceRefs = [.. unknown.SourceRefs.Select(r => r.MaterialId == request.NewsMaterialId ? r with { VersionId = "independent-unknown" } : r)] }] };
+        var news = unknown.SourceRefs.Single(r => r.MaterialId == request.NewsMaterialId);
+        var independent = request with { NewsVersionId = "independent-unknown", Drafts = [unknown with { SourceRefs = [.. unknown.SourceRefs, news with { VersionId = "independent-unknown" }] }] };
         var newScope = await preparation.PrepareAsync(new() { Request = independent, Drafts = independent.Drafts }).RequireContentAsync();
         Assert.Null(Assert.Single(newScope.Drafts).ExpectedPreviousRevisionId);
         var savedUnknown = (await service.Save(independent with { Drafts = newScope.Drafts }).RequireContentAsync()).Effects.Single();
