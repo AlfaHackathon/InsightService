@@ -23,6 +23,7 @@ public static class ServiceRegistration
         var database = DatabaseSettings.FromConfiguration(builder.Configuration);
         builder.Services.AddDapper(database).AddMigrations(database, typeof(Program).Assembly);
         builder.Services.AddScoped<IEffectRepository, EffectRepository>();
+        builder.Services.AddScoped<InsightReadRepository>();
         builder.Services.AddContextSourceResolver();
         builder.Services.AddScoped<IAnalysisService, AnalysisService>();
         builder.Services.AddScoped<ProjectionService>();
