@@ -29,7 +29,10 @@ public static class SwaggerRegistration
 
     public static WebApplication UseServiceSwagger(this WebApplication app)
     {
-        if (!app.Configuration.GetValue<bool>("Swagger:Enabled")) return app;
+        if (!app.Configuration.GetValue<bool>("Swagger:Enabled"))
+        {
+            return app;
+        }
         app.UseSwagger(options => options.RouteTemplate = "insight-service/swagger/{documentName}/swagger.json");
         app.UseSwaggerUI(options =>
         {
@@ -47,7 +50,10 @@ public sealed class InternalSwaggerOperationFilter : IOperationFilter
     {
         var internalRoute = context.ApiDescription.RelativePath?.StartsWith("insight-service/internal", StringComparison.Ordinal) == true;
         operation.Tags = [new OpenApiTag { Name = internalRoute ? "Internal — service credential required" : "Operations" }];
-        if (!internalRoute) return;
+        if (!internalRoute)
+        {
+            return;
+        }
         operation.Security = [new OpenApiSecurityRequirement
         {
             [new OpenApiSecurityScheme
