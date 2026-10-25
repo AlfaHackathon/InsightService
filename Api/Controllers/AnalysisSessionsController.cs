@@ -10,6 +10,7 @@ namespace InsightService.Controllers;
 public class AnalysisSessionsController(AnalysisSessionService sessions) : BaseController
 {
     [HttpPost]
+    [ProducesResponseType(typeof(AnalysisSessionResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> OpenAsync([FromBody] AnalysisRequest request)
     {
         return OkOrProblem(await sessions.OpenAsync(request));

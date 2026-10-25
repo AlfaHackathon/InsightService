@@ -11,11 +11,14 @@ namespace InsightService.Controllers;
 public sealed class NewsJobsController(INewsJobRepository store) : BaseController
 {
     [HttpPost("news-jobs")]
+    [ProducesResponseType(typeof(NewsJob), StatusCodes.Status200OK)]
     public async Task<IActionResult> Create([FromBody] NewsJobRequest request) => OkOrProblem<NewsJob>(await store.Create(request));
     [HttpGet("source-cursor")]
+    [ProducesResponseType(typeof(SourceCursor), StatusCodes.Status200OK)]
     public async Task<IActionResult> Cursor([FromQuery] string source = "context") => source is "context" or "company"
         ? OkOrProblem<SourceCursor>(await store.GetSourceCursor(source)) : BadRequest();
     [HttpPost("source-cursor")]
+    [ProducesResponseType(typeof(SourceCursor), StatusCodes.Status200OK)]
     public async Task<IActionResult> SaveCursor([FromBody] SourceCursor cursor, [FromQuery] string source = "context") => OkOrProblem<SourceCursor>(await store.SaveSourceCursor(cursor, source));
     [HttpPost("news-jobs/claim")]
     public async Task<IActionResult> Claim([FromBody] JobClaim request)
@@ -24,9 +27,12 @@ public sealed class NewsJobsController(INewsJobRepository store) : BaseControlle
         return result.Error is not null ? OkOrProblem(result) : Content(JsonSerializer.Serialize(result.Content, AnalysisProtocol.Json), "application/json");
     }
     [HttpGet("news-jobs/{jobId}")]
+    [ProducesResponseType(typeof(NewsJob), StatusCodes.Status200OK)]
     public async Task<IActionResult> Get([FromRoute] string jobId) => OkOrProblem<NewsJob>(await store.GetAsync(jobId));
     [HttpPost("news-jobs/{jobId}")]
+    [ProducesResponseType(typeof(NewsJob), StatusCodes.Status200OK)]
     public async Task<IActionResult> Update([FromRoute] string jobId, [FromBody] JobUpdate request) => OkOrProblem<NewsJob>(await store.Update(jobId, request));
     [HttpPost("news-jobs/{jobId}/retry")]
+    [ProducesResponseType(typeof(NewsJob), StatusCodes.Status200OK)]
     public async Task<IActionResult> Retry([FromRoute] string jobId) => OkOrProblem<NewsJob>(await store.Retry(jobId));
 }
