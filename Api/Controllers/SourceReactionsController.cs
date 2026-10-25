@@ -11,7 +11,9 @@ namespace InsightService.Controllers;
 public sealed class SourceReactionsController(IAnalysisService service) : BaseController
 {
     [HttpGet("question-recipients")]
+    [ProducesResponseType(typeof(RecipientPage), StatusCodes.Status200OK)]
     public async Task<IActionResult> Recipients([FromQuery, BindRequired] DateTimeOffset asOf, [FromQuery] string? after, [FromQuery] string? materialId) => OkOrProblem<RecipientPage>(await service.Recipients(asOf, after, materialId));
     [HttpPost("source-changes")]
+    [ProducesResponseType(typeof(ReactionPage), StatusCodes.Status200OK)]
     public async Task<IActionResult> React([FromBody] SourceChangeRequest change) => OkOrProblem<ReactionPage>(await service.React(change));
 }

@@ -12,8 +12,10 @@ namespace InsightService.Controllers;
 public sealed class AnalysesController(IAnalysisService service) : BaseController
 {
     [HttpPost("analyses")]
+    [ProducesResponseType(typeof(AnalysisReceipt), StatusCodes.Status200OK)]
     public async Task<IActionResult> Save([FromBody] AnalysisRequest request, CancellationToken ct) => OkOrProblem<AnalysisReceipt>(await service.Save(request, ct));
     [HttpGet("analyses")]
+    [ProducesResponseType(typeof(AnalysisReceipt), StatusCodes.Status200OK)]
     public async Task<IActionResult> Get([FromQuery, BindRequired] Guid companyId,
         [FromQuery, BindRequired] string newsMaterialId, [FromQuery, BindRequired] string newsVersionId,
         [FromQuery] string? triggerMaterialId, [FromQuery] string? triggerVersionId)
@@ -27,8 +29,10 @@ public sealed class AnalysesController(IAnalysisService service) : BaseControlle
             triggerMaterialId is null ? null : new(triggerMaterialId, triggerVersionId!)));
     }
     [HttpGet("effects")]
+    [ProducesResponseType(typeof(EffectSnapshot), StatusCodes.Status200OK)]
     public async Task<IActionResult> Snapshot([FromQuery, BindRequired] Guid companyId,
         [FromQuery, BindRequired] string newsMaterialId, [FromQuery] DateTimeOffset? asOf) => OkOrProblem<EffectSnapshot>(await service.GetSnapshot(companyId, newsMaterialId, asOf));
     [HttpGet("effects/{effectId}")]
+    [ProducesResponseType(typeof(EffectResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> Effect([FromRoute] string effectId) => OkOrProblem<EffectResponse>(await service.GetEffect(effectId));
 }

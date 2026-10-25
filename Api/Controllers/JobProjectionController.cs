@@ -10,6 +10,7 @@ namespace InsightService.Controllers;
 public sealed class JobProjectionController(JobProjectionService service) : BaseController
 {
     [HttpPost]
+    [ProducesResponseType(typeof(JobProjectionResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> ProjectAsync([FromBody] JobProjectionRequest request, CancellationToken ct)
     {
         return OkOrProblem<JobProjectionResponse>(await service.ProjectAsync(request, ct));

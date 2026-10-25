@@ -164,3 +164,13 @@ the calculator's responsibility. It does not establish completeness of company
 exposure, independently verify every contractual term, or infer object aliases.
 Qualitative questions, historical non-question writes, historical reads and
 already-completed receipt replay retain their existing behavior.
+
+## Swagger / OpenAPI
+
+Opt in with `Swagger__Enabled=true` (`Swagger:Enabled` in configuration), including Production.
+Default is disabled. UI: `/insight-service/swagger/index.html`; OpenAPI: `/insight-service/swagger/v1/swagger.json`.
+Swagger UI assets are served locally by the existing Swashbuckle dependency of `AlfaHackaton.Controllers`; no CDN or new package is used.
+The specification is generated from controller routes and request contracts. Internal operations are tagged and require `X-Internal-Secret`; a user Bearer token does not authorize them.
+Some `IActionResult` responses have no declared payload metadata: consult their contracts; an absent response schema is not an empty-result guarantee.
+No public insight/source facade, network route/port, authentication, or CORS policy is added. Existing internal middleware still enforces access.
+Only enable docs on an intended existing ingress/internal origin; this flag does not publish the service or change gateway routing. Do not embed credentials in frontend code or specs.
