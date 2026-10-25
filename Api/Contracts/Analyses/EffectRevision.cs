@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using InsightService.Contracts.Calculations;
 using InsightService.Contracts.Context;
 using InsightService.Contracts.Questions;
@@ -9,4 +10,5 @@ public sealed record EffectRevision(string RevisionId, string? PreviousRevisionI
     Calculation? Calculation, string? CalculationResult, bool? CalculationArithmeticOnly,
     DateTimeOffset CreatedAt, ImpactMetadata? Impact = null, string? NewsMaterialId = null, QuestionIdentity? Question = null,
     QuestionAssessment? Assessment = null, MaterialTrigger? Trigger = null, string? ModelExplanation = null,
-    string? PublicationClass = null);
+    string? PublicationClass = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] CompanyImportance? CompanyImportance = null);

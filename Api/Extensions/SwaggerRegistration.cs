@@ -23,6 +23,7 @@ public static class SwaggerRegistration
                 Description = "Configured service credential; user Bearer tokens do not authorize internal routes."
             });
             options.OperationFilter<InternalSwaggerOperationFilter>();
+            options.SchemaFilter<CompanyImportanceSchemaFilter>();
         });
         return services;
     }

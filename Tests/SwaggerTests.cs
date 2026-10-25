@@ -49,6 +49,12 @@ public sealed class SwaggerTests
         Assert.Equal("X-Internal-Secret", security.GetProperty("name").GetString());
         Assert.DoesNotContain("synthetic-docs-test-only", root.GetRawText(), StringComparison.Ordinal);
         Assert.True(operation.GetProperty("responses").GetProperty("200").TryGetProperty("content", out _));
+        var importance = root.GetProperty("components").GetProperty("schemas").GetProperty("CompanyImportance");
+        var score = importance.GetProperty("properties").GetProperty("score");
+        Assert.Equal(1, score.GetProperty("minimum").GetInt32());
+        Assert.Equal(5, score.GetProperty("maximum").GetInt32());
+        Assert.True(score.GetProperty("nullable").GetBoolean());
+        Assert.Equal(4, importance.GetProperty("example").GetProperty("score").GetInt32());
         using var ui = await client.GetAsync("/insight-service/swagger/index.html");
         Assert.Equal(HttpStatusCode.OK, ui.StatusCode);
         using var asset = await client.GetAsync("/insight-service/swagger/swagger-ui-bundle.js");
