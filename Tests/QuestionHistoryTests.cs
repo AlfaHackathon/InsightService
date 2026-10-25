@@ -298,7 +298,7 @@ public sealed class QuestionHistoryTests : IDisposable
                 Basis = "monthly_run_rate"
             },
             SourceRefs = [new("news-a", "v1", Hash), new("contract", "v1", Hash)],
-            Impact = new("expense_delta", "monthly_run_rate", null, "supported", 1, 1, 1),
+            Impact = new("expense_delta", "monthly_run_rate", "FixtureLoan", "supported", 1, 1, 1),
             Assessment = new([], [], new("established", "documented_exposure", "Synthetic own exposure", [new("contract", "v1", Hash)], []))
         };
         var saved = (await (Service().Save(request with
@@ -405,7 +405,7 @@ public sealed class QuestionHistoryTests : IDisposable
     {
         public async Task<Result<MaterialVersion>> GetAsync(string materialId, string versionId, CancellationToken ct)
         {
-            return new(await Task.FromResult(new MaterialVersion(materialId, versionId, "synthetic", materialId.StartsWith("news") ? "news" : "company", "Fixture", "Synthetic original", at, at, versionId == "v2" ? "v1" : null, materialId.StartsWith("news") ? [] : [company], [], Hash)), null);
+            return new(await Task.FromResult(new MaterialVersion(materialId, versionId, "synthetic", materialId.StartsWith("news") ? "news" : "company", "Fixture", "Synthetic original for FixtureLoan", at, at, versionId == "v2" ? "v1" : null, materialId.StartsWith("news") ? [] : [company], [], Hash)), null);
         }
     }
 

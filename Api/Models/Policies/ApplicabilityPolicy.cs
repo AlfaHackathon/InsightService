@@ -9,7 +9,8 @@ namespace InsightService.Models.Policies;
 
 public static class ApplicabilityPolicy
 {
-    public static async Task<Result> Validate(EffectDraft draft, Guid company, Func<string, string, Task<Result<MaterialVersion>>> material)
+    public static async Task<Result> Validate(EffectDraft draft, Guid company, Func<string, string, Task<Result<MaterialVersion>>> material,
+        bool validateFinancialSemantics = true)
     {
         var hasDependencies = draft.Assessment?.Conditions?.Any(c => c is not null &&
             (c.Id is not null || c.Assertion is not null || c.DependsOn is not null)) == true ||
@@ -99,7 +100,7 @@ public static class ApplicabilityPolicy
             return new(new Error("Unknown impact cannot be represented by a monetary calculation or zero.", ErrorSource.Client, ErrorType.CorruptedInfo) { HttpStatusCode = HttpStatusCode.UnprocessableEntity });
         }
 
-        return new();
+        return validateFinancialSemantics ? await FinancialSemanticsPolicy.Validate(draft, company, material) : new();
     }
 
     private static Error? ValidateDependencies(EffectDraft draft)
