@@ -62,7 +62,7 @@ public sealed class MvcContractTests : IDisposable
         using var prepare = await client.PostAsJsonAsync("/insight-service/internal/analyses/prepare", new
         {
             request,
-            drafts = new[] { draft with { Question = new("liquidity", "event_only", "qualitative", "2026", "2025", "unknown") } }
+            drafts = new[] { draft with { Calculation = null, Impact = null, Question = new("liquidity", "event_only", "qualitative", "2026", "2025", "unknown") } }
         });
         Assert.Equal(HttpStatusCode.OK, prepare.StatusCode);
         var prepared = (await prepare.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("drafts")[0];

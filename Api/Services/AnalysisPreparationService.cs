@@ -76,7 +76,9 @@ public sealed class AnalysisPreparationService(
                 candidate.HasCalculation ? new(new("value", "0"), "unknown", "unknown") : null,
                 new("unknown", "unknown", null, candidate.EvidenceStatus ?? "unknown", 0, 0, 0),
                 new("liquidity", "event_only", "qualitative", "unknown", null, "qualitative"), candidate.Assessment);
-            var result = await ApplicabilityPolicy.Validate(draft, request.CompanyId, MaterialAsync);
+            // Candidates only carry exposure/unknown status, not a financial question or object.
+            // Full draft preparation and final save perform financial binding validation.
+            var result = await ApplicabilityPolicy.Validate(draft, request.CompanyId, MaterialAsync, validateFinancialSemantics: false);
             if (result.Error is { } validationError)
             {
                 return new(validationError);
@@ -200,6 +202,24 @@ public sealed class AnalysisPreparationService(
                 };
             }
             prior.TryGetValue(prepared.EffectKey, out var existing);
+            if (prepared.Question is not null && prepared.Calculation is not null)
+            {
+                var financial = await ApplicabilityPolicy.Validate(prepared, request.CompanyId, async (materialId, versionId) =>
+                {
+                    var resolved = await sources.GetAsync(materialId, versionId, CancellationToken.None);
+                    if (resolved.Error is not null)
+                    {
+                        return resolved;
+                    }
+                    return resolved.Content!.KnownAt > request.AsOf
+                        ? new(Invalid())
+                        : resolved;
+                });
+                if (financial.Error is { } financialError)
+                {
+                    return new(financialError);
+                }
+            }
             if (existing is not null && existing.LiteralObjectRef != prepared.LiteralObjectRef)
             {
                 return new(Invalid());

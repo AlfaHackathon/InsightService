@@ -137,3 +137,30 @@ EffectResponse: `{effectId,effectKey,companyId,bankProfileId,newsMaterialId,lite
 PostgreSQL-операции находятся за `IEffectRepository`; все reads/writes одного изменения выполняются в одной организационной транзакции.
 
 `Tests/AnalysisTests.cs` проверяют correction15600→6240 с прежним effectId, повтор старой версии без отката, persistence/empty receipt, конфликт literal/stale prior, недопустимые citations, concurrent identical analyses, rollback пакета и арифметические границы. Детерминированная пауза на source resolution проверяет commit конкурента между первым чтением receipt и чтением head: одинаковый canonical request получает duplicate, отличающийся — 409. В этих component tests source resolver управляемый; настоящий HTTP resolver и три процесса проверяются отдельным интеграционным harness.
+
+## Financial source binding for new calculations
+
+New monetary drafts with a question require a nonblank `impact.economicObjectId`
+that occurs as a complete identifier in an exact cited own exposure document
+(`assessment.applicability.sourceRefs`). Public news and `provided-bank-csv`
+cannot establish this binding. Source company, material/version and hash must match.
+Preparation and final save enforce the same policy; failures return HTTP 422.
+
+For `frame=budget_delta`, `baselinePeriod` must identify `budget:<period>`.
+An own exposure document must also support a condition with
+`predicate=budget_baseline`, `status=supported`, `assertion=observed`, an empty
+`dependsOn`, and a `fact` copied exactly from that document. The excerpt must
+contain the exact budget identifier and economic object identifier. For example,
+an actual source excerpt `Approved budget:2027 for Loan-C-001: interest RUB 120000.`
+can bind that budget to that loan. The model's explanation, an ordinary loan
+rate, or a year appearing independently in a contract does not establish a budget.
+Documents without an explicit budget identifier cannot currently support this
+frame; preserve a non-budget comparison or missing-data question instead of
+inventing a budget identifier in the source.
+
+This is a conservative documentary binding gate, not a natural-language verifier:
+an exact excerpt still needs to assert the claimed budget, and arithmetic remains
+the calculator's responsibility. It does not establish completeness of company
+exposure, independently verify every contractual term, or infer object aliases.
+Qualitative questions, historical non-question writes, historical reads and
+already-completed receipt replay retain their existing behavior.
