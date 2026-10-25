@@ -1,21 +1,21 @@
 # Публичное чтение инсайтов для фронтенда
 
-Этот контракт реализован в ветке `codex/public-insight-read-20261025` поверх company-importance. Наличие кода/локальных HTTP-тестов не означает публикацию маршрутов на production. Gateway/nginx ingress проверяется отдельно после релиза. Новых портов, CORS, ACL и генерации эта ветка не добавляет.
+Этот owner-контракт реализован в `codex/public-insight-owner-20261025` поверх Insight master `2f3a4e40`. Наличие кода/локальных HTTP-тестов не означает публикацию маршрутов на production. Gateway/nginx ingress проверяется отдельно после релиза. Новых портов, CORS, ACL и генерации эта ветка не добавляет.
 
 ## Вызовы
 
-Внешний клиент использует Bearer через существующий AuthGateway. Agent получает проверенный `X-User-Id` внутри доверенной сети и сам запрашивает текущий membership CompanyService. Клиент не присылает `companyId`, `personId`, `asOf` или внутренний секрет. Direct Agent ingress не предназначен для публичного доступа.
+Внешний клиент использует Bearer через существующий AuthGateway. Insight получает проверенный `X-User-Id` внутри доверенной сети и сам запрашивает текущий membership CompanyService. Клиент не присылает `companyId`, `personId`, `asOf` или внутренний секрет. Direct Insight ingress не предназначен для публичного доступа.
 
 | Метод и путь | Для чего |
 | --- | --- |
-| `GET /agent-service/insights` | Главная: последние 5 personal-карточек; лента с фильтрами |
-| `GET /agent-service/insights/{kind}/{id}` | Деталь personal или general; ID брать из ленты |
-| `GET /agent-service/insights/personal/{id}/history` | Отдельная страница ревизий personal; общая история general пока отсутствует |
+| `GET /insight-service/insights` | Главная: последние 5 personal-карточек; лента с фильтрами |
+| `GET /insight-service/insights/{kind}/{id}` | Деталь personal или general; ID брать из ленты |
+| `GET /insight-service/insights/personal/{id}/history` | Отдельная страница ревизий personal; общая история general пока отсутствует |
 
 Лента: `kind=personal` по умолчанию либо `general`; `limit=1..20` (по умолчанию 5), `cursor` (не разбирать), `newsMaterialId`. Для personal также `status` (сохранённая строка, не новый UI enum), `mechanism` (из существующего question enum), `minImportance=1..5` (только новая обоснованная оценка). History: `limit=1..20`, по умолчанию 10, `cursor`. У detail query-параметров нет. Неизвестные и повторные параметры отвергаются.
 
 ```http
-GET /agent-service/insights?kind=personal&limit=5&minImportance=3
+GET /insight-service/insights?kind=personal&limit=5&minImportance=3
 Authorization: Bearer <client-token>
 ```
 
@@ -93,7 +93,7 @@ X-Internal-Secret: <service-only>
 
 Для новости также существует внутренний `POST /context-service/internal/news/resolve` с `{newsMaterialId,newsVersionId,asOf}`. `assistant_read_news` и `assistant_read_original` уже возвращают `original.provenance.sourceUrl`. Эти внутренние endpoints не предназначены для браузера; фронт берёт ссылку из публичного `sources[].provenance.sourceUrl` после релиза facade. Bank position не выводится из AI-текста и отдельного искусственного bank-position поля здесь нет.
 
-Перед выдачей каждой карточки Agent перечитывает точные версии источников и проверяет IDs/hash/knownAt<=saved asOf и текущий company/bank scope. Для general допускаются только публичные news/market без company/bank ACL и обязательный точный news anchor. Private-source карточка пропускается в feed; detail/history возвращают 404. Временная недоступность источника — ошибка, не успешная пустая лента.
+Перед выдачей каждой карточки Insight перечитывает точные версии источников и проверяет IDs/hash/knownAt<=saved asOf и текущий company/bank scope. Для general допускаются только публичные news/market без company/bank ACL и обязательный точный news anchor. Private-source карточка пропускается в feed; detail/history возвращают 404. Временная недоступность источника — ошибка, не успешная пустая лента.
 
 ## Ошибки, нагрузка и эксплуатация
 
@@ -114,8 +114,34 @@ X-Internal-Secret: <service-only>
 
 ## Релиз и ограничения
 
-Сначала InsightService с internal read dependency и importance, затем AgentService с facade/importance. Context изменений не требует. SQL migrations/backfill новых таблиц нет. Нужна существующая БД со штатными таблицами questions/effects/revisions/validity/news_jobs и функцией insight_utc_ticks. При откате Insight раньше Agent feed даст 503, не пустой успех; безопаснее первым откатить Agent. Публичные пути должны пройти smoke через существующий gateway на синтетическом user с membership и разрешёнными источниками. Не открывать дополнительные порты и не передавать секрет браузеру.
+Новая реализация — owner API в InsightService. Существующие repository/SQL/cursors переиспользованы локально, без self-HTTP; новая БД, миграция и повторная генерация не нужны. `MaterialVersion` дополнен optional nullable provenance, отсутствующее поле не сериализуется и не меняет старые canonical payloads.
 
-Swagger Agent: существующий opt-in `/agent-service/swagger/index.html`, spec `/agent-service/swagger/v1/swagger.json`; новая public группа Bearer. Insight Swagger документирует новые internal reads и их DTO под InternalSecret. Включение Swagger не расширяет доступ к API.
+Source-кандидат отдельно от ingress/deployment. Gateway сейчас не маршрутизирует эти новые public reads. Подготовленный конфиг должен добавить только GET/HEAD для `/insight-service/insights` и вложенных путей в private InsightService; `/insight-service/internal/*` не открывается. JWT проверяет существующий Gateway, который заменяет пользовательские identity headers. Insight guard требует один canonical UUID `X-User-Id` до query/DB/source reads. Внутренний secret не заменяет user identity. Сам header не является проверкой JWT при прямом доступе; сервис должен оставаться внутри доверенной сети.
 
-Не реализованы write-actions/deepen/feedback/assignment, general revision history/current invalidation tracking, persona адаптация (ждём контракт Артёма), нормализованные UI status/category enums и общие bank-position labels. Обсудить карточку можно существующим чатом текстом со стабильным ID; структурированная card-action admission в этот slice не добавлена.
+### Согласованный cutover и breaking change
+
+1. Выполнить native build/regression и public contract smoke Insight внутри разрешённого существующего контура.
+2. Отдельно подтвердить и применить узкий Gateway ingress, проверить Bearer/replaced identity, current membership, source scope и реальные HTTP DTO через внешний origin.
+3. В согласованном релизном окне переключить frontend base path и выпустить Agent removal candidate.
+4. Проверить, что старые Agent paths отвечают 404 и отсутствуют в Agent OpenAPI. Alias, redirect и fallback не добавляются.
+
+Breaking change: **вместо старого `/agent-service/insights…` использовать `/insight-service/insights…`**. Существующие IDs, query и непрозрачные cursors не пересоздаются. Не удалять работающие Agent routes до новых smoke; после cutover не оставлять их как legacy API. Rollback — восстановление сохранённых предыдущих версий согласованного релиза, не постоянный public alias.
+
+### Отдельная category integration
+
+Текущий base `2f3a4e40` ещё не содержит frozen shared category contract из `feat/insight-category` (`7720106`). Legacy `currentRevision.category` и `insight.category` остаются null; classification не выводится из знака эффекта. До cutover нужно обычной согласованной интеграцией подключить shared nullable поле/политику в projection и category query filter в существующем repository. В этом candidate category query не рекламируется и отвергается как неизвестный. Test-only release guard после появления shared model требует сохранить известную stored category и не позволяет молча заменить её null. Category pipeline и frozen PR эта ветка не переписывает.
+
+### Проверки и честные ограничения
+
+Новые `PublicInsight*Tests` используют fake dependencies и TestServer: trusted-header admission, current membership, scope/hash/time, nested evidence, budget/concurrency, precise Decimal strings, unknown/stale indicators, strict raw query, Swagger discriminated union и error contracts. Они не проверяют production JWT/ingress. Linked-source cloud harness заменяет организационные Result/Dapper интерфейсы; его PASS не является native build всего сервиса. Native package gate требует разрешённый executor с AlfaHackaton packages; known org-feed403 не обходится.
+
+```sh
+dotnet restore InsightService.slnx --configfile NuGet.config
+dotnet build InsightService.slnx -c Release --no-restore
+dotnet test Tests/InsightService.Tests.csproj -c Release --no-build --no-restore --filter 'FullyQualifiedName~PublicInsight'
+dotnet publish Api/InsightService.Api.csproj -c Release --no-restore -o ./publish
+```
+
+Full existing PostgreSQL regression suite требует заранее разрешённый synthetic `INSIGHT_TEST_POSTGRES` fixture по инструкции проекта; в рамках cloud-переноса новые PostgreSQL/Compose/environments не создаются. Native release gate и ingress smoke до их фактического запуска остаются pending.
+
+Swagger Insight: opt-in `/insight-service/swagger/index.html`, spec `/insight-service/swagger/v1/swagger.json`; public Bearer и internal secret описаны раздельно. Документация не расширяет доступ. Agent Swagger после cutover больше не содержит insight read paths.

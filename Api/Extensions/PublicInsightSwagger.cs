@@ -1,0 +1,66 @@
+using InsightService.Contracts.PublicReads;
+using InsightService.Controllers;
+using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi.Any;
+using Swashbuckle.AspNetCore.SwaggerGen;
+
+namespace InsightService.Extensions;
+
+public sealed class PublicInsightOperationFilter : IOperationFilter
+{
+    public void Apply(OpenApiOperation operation, OperationFilterContext context)
+    {
+        if (context.MethodInfo.DeclaringType != typeof(PublicInsightReadsController))
+            return;
+        operation.Tags = [new OpenApiTag { Name = "Public insights — Bearer via AuthGateway" }];
+        operation.Description = "Current company and bank scope are resolved server-side on every request, including history. Exact sources are verified before projection. Source-denied feed items may be omitted while the original cursor advances; exhaustive is false. No internal secret is accepted as user authority. Responses are private, no-store.";
+        operation.Security = [new OpenApiSecurityRequirement
+        {
+            [new OpenApiSecurityScheme { Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "GatewayBearer" } }] = Array.Empty<string>()
+        }];
+        foreach (var item in new Dictionary<string, string>
+        {
+            ["400"] = "Invalid strict query, kind, identifier or company/filter-bound cursor.",
+            ["401"] = "Trusted gateway user context missing or malformed.",
+            ["403"] = "Current company membership is required.",
+            ["404"] = "Insight/history missing or its sources are outside current permissions.",
+            ["502"] = "Saved read/source contract, identity, hash, time or importance evidence mismatch.",
+            ["503"] = "Source/dependency/storage unavailable or read budget exceeded; no empty success is implied."
+        })
+            operation.Responses.TryAdd(item.Key, new OpenApiResponse { Description = item.Value });
+    }
+}
+
+public sealed class PublicInsightSchemaFilter : ISchemaFilter
+{
+    public void Apply(OpenApiSchema schema, SchemaFilterContext context)
+    {
+        if (context.Type == typeof(PublicInsightCard))
+        {
+            schema.Type = null;
+            schema.Properties.Clear();
+            schema.Required.Clear();
+            schema.OneOf = [context.SchemaGenerator.GenerateSchema(typeof(PublicPersonalInsightCard), context.SchemaRepository),
+                context.SchemaGenerator.GenerateSchema(typeof(PublicGeneralInsightCard), context.SchemaRepository)];
+        }
+        if (context.Type == typeof(PublicPersonalInsightCard) || context.Type == typeof(PublicGeneralInsightCard))
+        {
+            schema.Required.Add("kind");
+            if (schema.Properties.TryGetValue("kind", out var kind))
+                kind.Enum = [new OpenApiString(context.Type == typeof(PublicPersonalInsightCard) ? "personal" : "general")];
+        }
+        if (context.Type == typeof(PublicInsightImportance) && schema.Properties.TryGetValue("score", out var score))
+        {
+            score.Minimum = 1;
+            score.Maximum = 5;
+            score.Nullable = true;
+        }
+        if (context.Type == typeof(PublicInsightRevision) && schema.Properties.TryGetValue("category", out var category))
+        {
+            category.Nullable = true;
+            category.Description = "Stored nullable category from the shared category contract. Absent remains null; never inferred from impact sign.";
+        }
+        if (context.Type == typeof(PublicInsightIndicator) && schema.Properties.TryGetValue("value", out var value))
+            value.Description = "Verbatim persisted Decimal result as a string. Missing is not zero; no browser-side recomputation.";
+    }
+}
