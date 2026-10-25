@@ -58,9 +58,15 @@ public sealed class InsightReadRepository(IDapperContext context)
         await transaction.Command(new QueryObject(InsightReadSql.ReadTransaction));
         var rows = await transaction.ListOrEmpty<PersonalRow>(new QueryObject(InsightReadSql.PersonalPage, new
         {
-            company = company.ToString("D"), now = DateTimeOffset.UtcNow.UtcTicks, take = options.Limit + 1,
-            status = options.Status, mechanism = options.Mechanism, news = options.NewsMaterialId, importance = options.MinImportance,
-            after = cursor?.After, id = cursor?.Id
+            company = company.ToString("D"),
+            now = DateTimeOffset.UtcNow.UtcTicks,
+            take = options.Limit + 1,
+            status = options.Status,
+            mechanism = options.Mechanism,
+            news = options.NewsMaterialId,
+            importance = options.MinImportance,
+            after = cursor?.After,
+            id = cursor?.Id
         }));
         var selected = rows.Take(options.Limit).ToArray();
         var last = selected.LastOrDefault();
@@ -114,8 +120,12 @@ public sealed class InsightReadRepository(IDapperContext context)
         await transaction.Command(new QueryObject(InsightReadSql.ReadTransaction));
         var rows = await transaction.ListOrEmpty<GeneralRow>(new QueryObject(InsightReadSql.GeneralPage, new
         {
-            company = company.ToString("D"), news = options.NewsMaterialId, take = options.Limit + 1,
-            after = cursor?.After, id = cursor?.Id, index = cursor?.Index
+            company = company.ToString("D"),
+            news = options.NewsMaterialId,
+            take = options.Limit + 1,
+            after = cursor?.After,
+            id = cursor?.Id,
+            index = cursor?.Index
         }));
         var selected = rows.Take(options.Limit).ToArray();
         var last = selected.LastOrDefault();
