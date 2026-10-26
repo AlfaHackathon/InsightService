@@ -42,7 +42,8 @@ internal static class EffectRevisionWriter
             request.Trigger,
             draft.ModelExplanation,
             ApplicabilityPolicy.PublicationClass(draft),
-            draft.CompanyImportance);
+            draft.CompanyImportance,
+            draft.Category);
         if ((await SaveRevision(transaction, effectId, revision, (current?.History.Count ?? 0) + 1, canonical)).Error is { } revisionError)
         {
             return new(revisionError);

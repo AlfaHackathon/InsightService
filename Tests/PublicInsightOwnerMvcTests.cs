@@ -26,11 +26,11 @@ public sealed class PublicInsightOwnerMvcTests
     {
         public int Calls;
         public PublicInsightMembership? Value = new(Company, null);
-        public Task<PublicInsightMembership?> Get(Guid userId, CancellationToken ct) { Assert.Equal(User, userId); Calls++; return Task.FromResult(Value); }
+        public Task<PublicInsightMembership?> GetAsync(Guid userId, CancellationToken ct) { Assert.Equal(User, userId); Calls++; return Task.FromResult(Value); }
     }
     private sealed class Sources : IPublicInsightSourceResolver
     {
-        public Task<MaterialVersion?> Get(string materialId, string versionId, CancellationToken ct) => throw new InvalidOperationException("No source reads expected for empty feed.");
+        public Task<MaterialVersion?> GetAsync(string materialId, string versionId, CancellationToken ct) => throw new InvalidOperationException("No source reads expected for empty feed.");
     }
     private sealed class Store : IPublicInsightReadStore
     {
@@ -39,7 +39,7 @@ public sealed class PublicInsightOwnerMvcTests
         public Task<InsightReadPage<PersonalInsightRead>> PersonalPage(Guid company, InsightReadOptions options, CancellationToken ct) { Assert.Equal(Company, company); Calls++; Query = options; return Task.FromResult(new InsightReadPage<PersonalInsightRead>(company, [], null)); }
         public Task<PersonalInsightRead?> PersonalDetail(Guid company, string id, CancellationToken ct) { Calls++; return Task.FromResult<PersonalInsightRead?>(null); }
         public Task<InsightReadPage<EffectRevision>?> PersonalHistory(Guid company, string id, int limit, string? cursor, CancellationToken ct) => throw new InvalidOperationException("Missing detail should prevent history read.");
-        public Task<InsightReadPage<GeneralInsightRead>> GeneralPage(Guid company, InsightReadOptions options, CancellationToken ct) { Assert.Equal(Company, company); Calls++; return Task.FromResult(new InsightReadPage<GeneralInsightRead>(company, [], null)); }
+        public Task<InsightReadPage<GeneralInsightRead>> GeneralPage(Guid company, InsightReadOptions options, CancellationToken ct) { Assert.Equal(Company, company); Calls++; Query = options; return Task.FromResult(new InsightReadPage<GeneralInsightRead>(company, [], null)); }
         public Task<GeneralInsightRead?> GeneralDetail(Guid company, string id, CancellationToken ct) { Calls++; return Task.FromResult<GeneralInsightRead?>(null); }
     }
     private static async Task<WebApplication> Start(Memberships memberships, Store store)
@@ -77,7 +77,10 @@ public sealed class PublicInsightOwnerMvcTests
         client.DefaultRequestHeaders.Authorization = new("Bearer", "not-authority-inside-this-private-service");
         client.DefaultRequestHeaders.Add("X-Internal-Secret", "synthetic-only");
         if (identity is not null)
+        {
             client.DefaultRequestHeaders.TryAddWithoutValidation("X-User-Id", identity);
+        }
+
         using var response = await client.GetAsync("/insight-service/insights?limit=invalid");
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         Assert.True(response.Headers.CacheControl!.Private);
@@ -105,6 +108,38 @@ public sealed class PublicInsightOwnerMvcTests
         Assert.Equal("financing_cost", store.Query.Mechanism);
         Assert.True(response.Headers.CacheControl!.NoStore);
     }
+    [Fact]
+    public async Task OwnedFeedHeadReturnsHeadersWithoutResponseBody()
+    {
+        var store = new Store();
+        await using var app = await Start(new(), store);
+        using var client = app.GetTestClient();
+        client.DefaultRequestHeaders.Add("X-User-Id", User.ToString("D"));
+        using var request = new HttpRequestMessage(HttpMethod.Head, "/insight-service/insights");
+        using var response = await client.SendAsync(request);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Empty(await response.Content.ReadAsByteArrayAsync());
+        Assert.True(response.Headers.CacheControl!.NoStore);
+        Assert.Equal(1, store.Calls);
+    }
+    [Theory]
+    [InlineData("personal", "risk")]
+    [InlineData("personal", "opportunity")]
+    [InlineData("personal", "event")]
+    [InlineData("general", "risk")]
+    [InlineData("general", "opportunity")]
+    [InlineData("general", "event")]
+    public async Task PublicCategoryQueryIsAcceptedAndPreservedForBothKinds(string kind, string category)
+    {
+        var store = new Store();
+        await using var app = await Start(new(), store);
+        using var client = app.GetTestClient();
+        client.DefaultRequestHeaders.Add("X-User-Id", User.ToString("D"));
+        using var response = await client.GetAsync($"/insight-service/insights?kind={kind}&category={category}");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(category, store.Query!.Category);
+        Assert.Equal(1, store.Calls);
+    }
     [Theory]
     [InlineData("?companyId=other")]
     [InlineData("?personId=other")]
@@ -117,7 +152,15 @@ public sealed class PublicInsightOwnerMvcTests
     [InlineData("?kind=general&minImportance=1")]
     [InlineData("?kind=invalid")]
     [InlineData("?mechanism=invalid")]
-    [InlineData("?category=event")]
+    [InlineData("?category=")]
+    [InlineData("?category=%20")]
+    [InlineData("?category=null")]
+    [InlineData("?category=unknown")]
+    [InlineData("?category=mixed")]
+    [InlineData("?category=Risk")]
+    [InlineData("?category=risk&category=event")]
+    [InlineData("?Category=risk")]
+    [InlineData("?kind=general&category=event&status=forecast")]
     [InlineData("?status=")]
     [InlineData("?mechanism=")]
     [InlineData("?mechanism=%20")]
@@ -175,6 +218,8 @@ public sealed class PublicInsightOwnerMvcTests
         var operation = spec.GetProperty("paths").GetProperty("/insight-service/insights").GetProperty("get");
         Assert.True(operation.GetProperty("security")[0].TryGetProperty("GatewayBearer", out _));
         Assert.False(operation.GetProperty("security")[0].TryGetProperty("InternalSecret", out _));
+        var filter = Assert.Single(operation.GetProperty("parameters").EnumerateArray(), parameter => parameter.GetProperty("name").GetString()!.Equals("category", StringComparison.OrdinalIgnoreCase));
+        Assert.Equal(["risk", "opportunity", "event"], filter.GetProperty("schema").GetProperty("enum").EnumerateArray().Select(value => value.GetString()!).ToArray());
         var schemas = spec.GetProperty("components").GetProperty("schemas");
         Assert.Equal(2, schemas.GetProperty("PublicInsightCard").GetProperty("oneOf").GetArrayLength());
         foreach (var pair in new[] { ("PublicPersonalInsightCard", "personal"), ("PublicGeneralInsightCard", "general") })
@@ -182,6 +227,12 @@ public sealed class PublicInsightOwnerMvcTests
             var schema = schemas.GetProperty(pair.Item1);
             Assert.Contains(schema.GetProperty("required").EnumerateArray(), value => value.GetString() == "kind");
             Assert.Equal(pair.Item2, Assert.Single(schema.GetProperty("properties").GetProperty("kind").GetProperty("enum").EnumerateArray()).GetString());
+        }
+        foreach (var type in new[] { "PublicInsightRevision", "PublicGeneralInsight", "EffectRevision" })
+        {
+            var category = schemas.GetProperty(type).GetProperty("properties").GetProperty("category");
+            Assert.True(category.GetProperty("nullable").GetBoolean());
+            Assert.Equal(["risk", "opportunity", "event"], category.GetProperty("enum").EnumerateArray().Select(value => value.GetString()!).ToArray());
         }
         Assert.False(spec.GetProperty("paths").TryGetProperty("/agent-service/insights", out _));
     }

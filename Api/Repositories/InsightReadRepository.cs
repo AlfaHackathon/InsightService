@@ -4,6 +4,7 @@ using AlfaHackaton.DapperContext.Dapper;
 using InsightService.Common;
 using InsightService.Contracts.Analyses;
 using InsightService.Contracts.Reads;
+using InsightService.Models.Policies;
 using InsightService.Resources;
 
 namespace InsightService.Repositories;
@@ -42,11 +43,16 @@ public sealed class InsightReadRepository(IDapperContext context)
     }
     private static string Filter(InsightReadOptions options)
     {
-        if (options.Status?.Length > 100 || options.Mechanism?.Length > 100 || options.NewsMaterialId?.Length > 200 || options.MinImportance is < 1 or > 5)
+        if (!InsightCategoryPolicy.IsValid(options.Category) || options.Status?.Length > 100 || options.Mechanism?.Length > 100 || options.NewsMaterialId?.Length > 200 || options.MinImportance is < 1 or > 5)
         {
             throw new BadHttpRequestException("Invalid read filters.");
         }
-        return JsonSerializer.Serialize(new object?[] { options.Status, options.Mechanism, options.NewsMaterialId, options.MinImportance }, AnalysisProtocol.Json);
+        var values = new List<object?> { options.Status, options.Mechanism, options.NewsMaterialId, options.MinImportance };
+        if (options.Category is not null)
+        {
+            values.Add(options.Category);
+        }
+        return JsonSerializer.Serialize(values, AnalysisProtocol.Json);
     }
 
     public async Task<InsightReadPage<PersonalInsightRead>> PersonalPage(Guid company, InsightReadOptions options)
@@ -63,6 +69,7 @@ public sealed class InsightReadRepository(IDapperContext context)
             take = options.Limit + 1,
             status = options.Status,
             mechanism = options.Mechanism,
+            category = options.Category,
             news = options.NewsMaterialId,
             importance = options.MinImportance,
             after = cursor?.After,
@@ -121,6 +128,7 @@ public sealed class InsightReadRepository(IDapperContext context)
         var rows = await transaction.ListOrEmpty<GeneralRow>(new QueryObject(InsightReadSql.GeneralPage, new
         {
             company = company.ToString("D"),
+            category = options.Category,
             news = options.NewsMaterialId,
             take = options.Limit + 1,
             after = cursor?.After,

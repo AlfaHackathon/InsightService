@@ -27,7 +27,7 @@ internal static partial class PublicInsightProjection
                 a.Unknowns.Select(u => new PublicInsightMissingFact(u.Fact, u.Query, u.Scope, u.MaterialId, u.Id)).ToArray(),
                 app is null ? null : new(app.Status, app.Basis, app.Explanation, References(app.SourceRefs), app.Assumptions)),
             r.Trigger is { } trigger ? new(trigger.MaterialId, trigger.VersionId) : null, r.PublicationClass,
-            Category: null); // Exactly one stored-property assignment after the shared category model is integrated.
+            Category: r.Category);
     }
     internal static PublicInsightSource Metadata(MaterialVersion source)
     {
@@ -49,25 +49,43 @@ internal static partial class PublicInsightProjection
     }));
 
     internal static EffectDraft Draft(EffectRevision r) => new("public-read", "public-read", null, r.Conclusion, r.Status, r.SourceRefs,
-        r.Calculation, r.Impact, r.Question, r.Assessment, CompanyImportance: r.CompanyImportance);
+        r.Calculation, r.Impact, r.Question, r.Assessment, CompanyImportance: r.CompanyImportance, Category: r.Category);
 
     internal static async Task<(PublicInsightIndicator[] Items, PublicIndicatorAvailability Availability)> Indicators(EffectRevision r,
         bool stale, IReadOnlyList<MaterialVersion> sources, Guid company)
     {
         if (stale)
+        {
             return Unavailable("stale_sources");
+        }
+
         if (r.Calculation is not { } calculation)
+        {
             return Unavailable("no_calculation");
+        }
+
         if (r.CalculationResult is null || !DecimalResultPattern().IsMatch(r.CalculationResult))
+        {
             return Unavailable("missing_result");
+        }
+
         if (r.Question is not { } question || r.Assessment is not { } assessment)
+        {
             return Unavailable("insufficient_evidence");
+        }
+
         if (!PublicInsightValidation.QuestionForIndicator(question) || question.TargetPeriod == "unknown")
+        {
             return Unavailable("unknown_period");
+        }
+
         var unit = TrimUnit(question.Unit);
         if (question.Unit != calculation.Unit || question.TargetPeriod != calculation.Period ||
             unit.Length == 0 || unit.ToLowerInvariant() is "unknown" or "qualitative")
+        {
             return Unavailable("insufficient_evidence");
+        }
+
         var applicability = assessment.Applicability;
         var cited = r.SourceRefs.ToHashSet();
         var documentary = sources.Where(source => source.Kind == "company" && source.SourceId != "provided-bank-csv" &&
@@ -76,25 +94,43 @@ internal static partial class PublicInsightProjection
         var status = r.Impact?.EvidenceStatus;
         if (documentary.Length == 0 || applicability is not { Status: "established", Basis: "documented_exposure" } ||
             status is not ("supported" or "conditional") || applicability.SourceRefs.Any(reference => !cited.Contains(reference)))
+        {
             return Unavailable("insufficient_evidence");
+        }
+
         var objectId = r.Impact?.EconomicObjectId;
         if (string.IsNullOrWhiteSpace(objectId) || objectId.Any(char.IsControl) || !documentary.Any(source => ContainsIdentifier(source.Text, objectId)))
+        {
             return Unavailable("insufficient_evidence");
+        }
+
         if ((status == "conditional" && applicability.Assumptions.Length == 0) ||
             (status == "supported" && (applicability.Assumptions.Length > 0 || assessment.Unknowns.Length > 0 || assessment.Conditions.Any(c => c.Status != "supported"))) ||
             (r.PublicationClass is not null && r.PublicationClass != (status == "supported" ? "consequence" : "scenario")) ||
             assessment.Conditions.Any(c => c.SourceRefs.Any(reference => !cited.Contains(reference)) || c.Status != "unknown" && c.SourceRefs.Length == 0))
+        {
             return Unavailable("insufficient_evidence");
+        }
+
         var byIdentity = sources.GroupBy(source => (source.MaterialId, source.VersionId)).ToDictionary(group => group.Key, group => group.First());
         Task<Result<MaterialVersion>> Resolve(string material, string version) => Task.FromResult(new Result<MaterialVersion>(byIdentity[(material, version)], null));
         // Reuse the canonical DAG/applicability policy on a read-only draft. A failed guard suppresses only the indicator.
         if ((await ApplicabilityPolicy.Validate(Draft(r), company, Resolve, validateFinancialSemantics: false)).Error is not null)
+        {
             return Unavailable("insufficient_evidence");
+        }
+
         var delta = r.Impact?.Metric is "expense_delta" or "revenue_delta" or "cashflow_delta";
         if (question.Frame == "absolute" && delta || question.Frame != "budget_delta" && question.BaselinePeriod?.StartsWith("budget:", StringComparison.Ordinal) == true)
+        {
             return Unavailable("insufficient_evidence");
+        }
+
         if (calculation.Period == "unknown")
+        {
             return Unavailable("unknown_period");
+        }
+
         if (question.Frame == "budget_delta")
         {
             var baseline = question.BaselinePeriod;
@@ -103,7 +139,9 @@ internal static partial class PublicInsightProjection
                 ContainsIdentifier(condition.Fact, baseline) && ContainsIdentifier(condition.Fact, objectId) && documentary.Any(source =>
                     source.Text.Contains(condition.Fact, StringComparison.Ordinal) && condition.SourceRefs.Contains(new(source.MaterialId, source.VersionId, source.ContentHash))));
             if (!proven)
+            {
                 return Unavailable("unknown_baseline");
+            }
         }
         // Do not parse/recalculate/rescale this string. Null is never a monetary zero.
         var metric = r.Impact!.Metric;
@@ -120,9 +158,15 @@ internal static partial class PublicInsightProjection
         var start = 0;
         var end = value.Length;
         while (start < end && Space(value[start]))
+        {
             start++;
+        }
+
         while (end > start && Space(value[end - 1]))
+        {
             end--;
+        }
+
         return value[start..end];
     }
 
@@ -137,12 +181,18 @@ internal static partial class PublicInsightProjection
         {
             var index = text.IndexOf(identifier, start, StringComparison.Ordinal);
             if (index < 0)
+            {
                 return false;
+            }
+
             var end = index + identifier.Length;
             var before = index == 0 || Rune.DecodeLastFromUtf16(text.AsSpan(0, index), out var prior, out _) != OperationStatus.Done || !IdentifierRune(prior);
             var after = end == text.Length || Rune.DecodeFromUtf16(text.AsSpan(end), out var next, out _) != OperationStatus.Done || !IdentifierRune(next);
             if (before && after)
+            {
                 return true;
+            }
+
             start = index + 1;
         }
         return false;

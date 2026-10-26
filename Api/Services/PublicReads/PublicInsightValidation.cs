@@ -6,6 +6,7 @@ using InsightService.Contracts.Calculations;
 using InsightService.Contracts.Context;
 using InsightService.Contracts.PublicReads;
 using InsightService.Contracts.Questions;
+using InsightService.Models.Policies;
 
 namespace InsightService.Services.PublicReads;
 
@@ -17,7 +18,9 @@ internal static partial class PublicInsightValidation
     internal static void Require(bool valid, string code = "INSIGHT_READ_CONTRACT")
     {
         if (!valid)
+        {
             throw PublicInsightReadException.Contract(code);
+        }
     }
     internal static bool Text(string? value, int maximum, int minimum = 1) => value is not null && value.Length >= minimum && value.Length <= maximum;
     internal static bool Identifier(string? value) => Text(value, 200) && !string.IsNullOrWhiteSpace(value);
@@ -27,7 +30,9 @@ internal static partial class PublicInsightValidation
     {
         Require(refs is not null && refs.Length >= minimum && refs.Length <= maximum);
         foreach (var reference in refs!)
+        {
             Reference(reference);
+        }
     }
     internal static bool QuestionForIndicator(QuestionIdentity question) => Mechanisms.Contains(question.Mechanism) && Frames.Contains(question.Frame) &&
         Text(question.Unit, 64) && PeriodPattern().IsMatch(question.TargetPeriod) &&
@@ -37,6 +42,7 @@ internal static partial class PublicInsightValidation
     {
         Require(revision is not null);
         var r = revision!;
+        Require(InsightCategoryPolicy.IsValid(r.Category));
         Require(Identifier(r.RevisionId) && (r.PreviousRevisionId is null || Identifier(r.PreviousRevisionId)) && Identifier(r.NewsVersionId) &&
             r.AsOf != default && r.CreatedAt != default && r.Conclusion is not null && Text(r.Status, 100) &&
             (r.NewsMaterialId is null || Identifier(r.NewsMaterialId)) &&
@@ -44,7 +50,10 @@ internal static partial class PublicInsightValidation
         References(r.SourceRefs, int.MaxValue);
         var outerReferences = r.SourceRefs.ToHashSet();
         if (r.Trigger is { } trigger)
+        {
             Require(Identifier(trigger.MaterialId) && Identifier(trigger.VersionId));
+        }
+
         if (r.Question is { } q)
         {
             // Historical periods remain readable. Current indicator dimensions are checked separately.
@@ -52,10 +61,13 @@ internal static partial class PublicInsightValidation
                 (q.Basis is null || Bases.Contains(q.Basis)) && (q.Frame != "budget_delta" || q.BaselinePeriod is not null));
         }
         if (r.Impact is { } impact)
+        {
             Require(Identifier(impact.Metric) && Identifier(impact.AmountBasis) &&
             (impact.EconomicObjectId is null || Text(impact.EconomicObjectId, 500)) &&
             impact.EvidenceStatus is "supported" or "conditional" or "unknown" or "contradicted" or "unaffected" &&
             impact.Importance is >= 0 and <= 5 && impact.Urgency is >= 0 and <= 5 && impact.Novelty is >= 0 and <= 5);
+        }
+
         if (r.CompanyImportance is { } importance)
         {
             Require(importance.Score is null or >= 1 and <= 5 && Text(importance.Rationale?.Trim(), 2000));
@@ -100,7 +112,9 @@ internal static partial class PublicInsightValidation
     {
         Require(node is not null && ++count <= 127 && depth <= 12);
         if (node!.Kind == "value")
+        {
             Require(Text(node.Value, 100) && DecimalLiteralPattern().IsMatch(node.Value!) && node.Left is null && node.Right is null);
+        }
         else
         {
             Require(node.Kind is "add" or "subtract" or "multiply" or "divide" or "min" or "max" && node.Value is null);
@@ -136,13 +150,22 @@ internal static partial class PublicInsightValidation
         Strings(value.Unknowns, 16, 1000, 0);
         Require(value.SourceRefs is { Length: >= 1 and <= 32 });
         foreach (var r in value.SourceRefs)
+        {
             Require(r is not null && Identifier(r.MaterialId) && Identifier(r.VersionId) && Hash(r.ContentHash));
+        }
+
         if (value.SignalIds is { } signals)
+        {
             Require(signals.Length <= 128 && signals.All(s => s is not null));
+        }
+
         if (value.Quality is { } quality)
+        {
             Require(Text(quality.DecisionQuestion, 700) && Text(quality.DistinctContribution, 700) && quality.Priority is "high" or "medium" or "low" && quality.Novelty is "news_specific" or "source_context");
-        // Base release has no frozen category contract. Shared category integration replaces this one assignment.
-        return value with { Category = null };
+        }
+
+        Require(InsightCategoryPolicy.IsValid(value.Category));
+        return value;
     }
     internal static bool TryInstant(string? text, out DateTimeOffset instant)
     {

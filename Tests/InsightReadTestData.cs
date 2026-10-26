@@ -96,7 +96,7 @@ internal static class InsightReadTestData
     }
 
     internal static async Task Job(PgTestDatabase database, string id, long order, Guid[] selected, string news = "shared-news",
-        string status = "completed", int count = 1, string companyStatus = "completed")
+        string status = "completed", int count = 1, string companyStatus = "completed", string? category = null)
     {
         var request = new NewsJobRequest(id, news, "v1", Time,
             JsonSerializer.SerializeToElement(new { textCompleteness = "lead" }));
@@ -111,6 +111,7 @@ internal static class InsightReadTestData
             {
                 generalInsights = Enumerable.Range(0, count).Select(index => new
                 {
+                    category,
                     title = id + ":" + index,
                     conclusion = "Synthetic general conclusion",
                     mechanism = "liquidity",

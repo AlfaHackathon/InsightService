@@ -14,7 +14,10 @@ public sealed class PublicInsightReadTests
         var error = await Assert.ThrowsAsync<PublicInsightReadException>(action);
         Assert.Equal(status, error.StatusCode);
         if (code is not null)
+        {
             Assert.Equal(code, error.Code);
+        }
+
         Assert.DoesNotContain("PRIVATE", error.Message);
         return error;
     }
@@ -39,7 +42,9 @@ public sealed class PublicInsightReadTests
         Assert.True(json.TryGetProperty("currentRevision", out _));
         Assert.Equal(JsonValueKind.Null, json.GetProperty("currentRevision").GetProperty("category").ValueKind);
         foreach (var hidden in new[] { "PRIVATE-AUDIT", "PRIVATE-LOCATOR", "Synthetic loan", "modelExplanation", "calculationResult", "expression", "importance\"", "bankProfileIds", "companyIds" })
+        {
             Assert.DoesNotContain(hidden, json.GetRawText());
+        }
     }
 
     [Fact]
@@ -144,7 +149,10 @@ public sealed class PublicInsightReadTests
         var own = f.Materials[("own", "v1")];
         var additional = Enumerable.Range(0, 8).Select(index => PublicInsightReadFixture.Material("extra-" + index, "market", [])).ToArray();
         foreach (var item in additional)
+        {
             f.Materials[(item.MaterialId, item.VersionId)] = item;
+        }
+
         var revision = f.Personal!.CurrentRevision;
         f.Personal = f.Personal with { CurrentRevision = revision with { SourceRefs = revision.SourceRefs.Concat(additional.Select(PublicInsightReadFixture.Ref)).Append(PublicInsightReadFixture.Ref(own)).ToArray() } };
         var pending = Feed(f);
@@ -221,6 +229,8 @@ public sealed class PublicInsightReadTests
     [InlineData("cursor")]
     [InlineData("mechanism")]
     [InlineData("general-filter")]
+    [InlineData("category")]
+    [InlineData("empty-category")]
     public async Task InvalidQueriesAreRejectedBeforeMembership(string cause)
     {
         var f = new PublicInsightReadFixture();
@@ -230,6 +240,8 @@ public sealed class PublicInsightReadTests
             "limit" => new() { Limit = 21 },
             "cursor" => new() { Cursor = new string('x', 2049) },
             "mechanism" => new() { Mechanism = "arbitrary" },
+            "category" => new() { Category = "unknown" },
+            "empty-category" => new() { Category = "" },
             _ => new() { Kind = "general", MinImportance = 4 }
         };
         await Error(() => Feed(f, query), 400, "INVALID_REQUEST");
@@ -268,29 +280,55 @@ public sealed class PublicInsightReadTests
         Assert.Equal(0, f.SourceCalls); // No expansion or fetch of the nested foreign/hash-mismatched references.
     }
 
-    [Fact]
-    public async Task SharedCategoryIntegrationMustBindStoredCategoryRatherThanSilentlyDiscardKnownValues()
+    [Theory]
+    [InlineData(null)]
+    [InlineData("risk")]
+    [InlineData("opportunity")]
+    [InlineData("event")]
+    public async Task SharedCategoryIntegrationPreservesStoredPersonalHistoryAndGeneralValuesIncludingLegacyNull(string? category)
     {
-        // Reflection is a test-only integration guard. Production never probes for optional domain features.
-        var categorySupported = typeof(EffectRevision).GetProperty("Category") is not null;
         var f = new PublicInsightReadFixture();
-        var revision = JsonSerializer.SerializeToNode(f.Personal!.CurrentRevision, AnalysisProtocol.Json)!.AsObject();
-        revision["category"] = "risk";
-        f.Personal = f.Personal with { CurrentRevision = revision.Deserialize<EffectRevision>(AnalysisProtocol.Json)! };
+        f.Personal = f.Personal! with { CurrentRevision = f.Personal.CurrentRevision with { Category = category } };
         var personal = Assert.IsType<PublicPersonalInsightCard>(Assert.Single((await Feed(f)).Items));
-        if (categorySupported)
-            Assert.Equal("risk", personal.CurrentRevision.Category);
-        else
-            Assert.Null(personal.CurrentRevision.Category);
-
+        Assert.Equal(category, personal.CurrentRevision.Category);
+        var detail = Assert.IsType<PublicPersonalInsightCard>(await f.Service().Detail(PublicInsightReadFixture.User, "personal", "question-1", default));
+        Assert.Equal(category, detail.CurrentRevision.Category);
+        var history = await f.Service().History(PublicInsightReadFixture.User, "question-1", new(), default);
+        Assert.Equal(category, Assert.Single(history.Items).Revision.Category);
         var general = JsonSerializer.SerializeToNode(f.General!.Insight, AnalysisProtocol.Json)!.AsObject();
-        general["category"] = "risk";
+        general["category"] = category;
         f.General = f.General with { Insight = JsonSerializer.SerializeToElement(general, AnalysisProtocol.Json) };
         var card = Assert.IsType<PublicGeneralInsightCard>(Assert.Single((await Feed(f, new() { Kind = "general" })).Items));
-        if (categorySupported)
-            Assert.Equal("risk", card.Insight.Category);
-        else
-            Assert.Null(card.Insight.Category);
+        Assert.Equal(category, card.Insight.Category);
+        var generalDetail = Assert.IsType<PublicGeneralInsightCard>(await f.Service().Detail(PublicInsightReadFixture.User, "general", "opaque-general", default));
+        Assert.Equal(category, generalDetail.Insight.Category);
+    }
+
+    [Theory]
+    [InlineData("unknown")]
+    [InlineData("mixed")]
+    [InlineData("")]
+    [InlineData("Risk")]
+    public async Task InvalidStoredCategoryIsAContractFailureAndNeverAnEventFallback(string category)
+    {
+        var f = new PublicInsightReadFixture();
+        f.Personal = f.Personal! with { CurrentRevision = f.Personal.CurrentRevision with { Category = category } };
+        await Error(() => Feed(f), 502, "INSIGHT_READ_CONTRACT");
+        var general = JsonSerializer.SerializeToNode(f.General!.Insight, AnalysisProtocol.Json)!.AsObject();
+        general["category"] = category;
+        f.General = f.General with { Insight = JsonSerializer.SerializeToElement(general, AnalysisProtocol.Json) };
+        await Error(() => Feed(f, new() { Kind = "general" }), 502, "INSIGHT_READ_CONTRACT");
+        Assert.Equal(0, f.SourceCalls);
+    }
+
+    [Theory]
+    [InlineData("personal")]
+    [InlineData("general")]
+    public async Task CategoryFilterIsPassedToExistingLocalStoreForEitherKind(string kind)
+    {
+        var f = new PublicInsightReadFixture();
+        await Feed(f, new() { Kind = kind, Category = "risk" });
+        Assert.Equal("risk", f.Options!.Category);
     }
 
     [Fact]

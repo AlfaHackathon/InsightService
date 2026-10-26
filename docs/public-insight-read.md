@@ -1,6 +1,6 @@
 # Публичное чтение инсайтов для фронтенда
 
-Этот owner-контракт реализован в `codex/public-insight-owner-20261025` поверх Insight master `2f3a4e40`. Наличие кода/локальных HTTP-тестов не означает публикацию маршрутов на production. Gateway/nginx ingress проверяется отдельно после релиза. Новых портов, CORS, ACL и генерации эта ветка не добавляет.
+Этот согласованный integration candidate объединяет owner API `9edf45fb` и shared category contract `7720106` в отдельной ветке `codex/insight-owner-category-integration-20261025`. Наличие кода/локальных HTTP-тестов не означает публикацию маршрутов на production. Gateway/nginx ingress проверяется отдельно после релиза. Новых портов, CORS, ACL и генерации эта ветка не добавляет.
 
 ## Вызовы
 
@@ -8,11 +8,13 @@
 
 | Метод и путь | Для чего |
 | --- | --- |
-| `GET /insight-service/insights` | Главная: последние 5 personal-карточек; лента с фильтрами |
-| `GET /insight-service/insights/{kind}/{id}` | Деталь personal или general; ID брать из ленты |
-| `GET /insight-service/insights/personal/{id}/history` | Отдельная страница ревизий personal; общая история general пока отсутствует |
+| `GET/HEAD /insight-service/insights` | Главная: последние 5 personal-карточек; лента с фильтрами |
+| `GET/HEAD /insight-service/insights/{kind}/{id}` | Деталь personal или general; ID брать из ленты |
+| `GET/HEAD /insight-service/insights/personal/{id}/history` | Отдельная страница ревизий personal; общая история general пока отсутствует |
 
-Лента: `kind=personal` по умолчанию либо `general`; `limit=1..20` (по умолчанию 5), `cursor` (не разбирать), `newsMaterialId`. Для personal также `status` (сохранённая строка, не новый UI enum), `mechanism` (из существующего question enum), `minImportance=1..5` (только новая обоснованная оценка). History: `limit=1..20`, по умолчанию 10, `cursor`. У detail query-параметров нет. Неизвестные и повторные параметры отвергаются.
+HEAD использует те же проверки membership, источников и query, что GET; успешный ответ имеет 200 и пустое тело.
+
+Лента: `kind=personal` по умолчанию либо `general`; `limit=1..20` (по умолчанию 5), `cursor` (не разбирать), `newsMaterialId`, `category=risk|opportunity|event` для personal и general. Категорию можно не передавать: тогда включены все значения, включая legacy null. Пустые/неизвестные значения, `category=null` и повторные параметры дают 400; фильтра только null нет. Для personal также `status` (сохранённая строка, не новый UI enum), `mechanism` (из существующего question enum), `minImportance=1..5` (только новая обоснованная оценка). History: `limit=1..20`, по умолчанию 10, `cursor`. У detail query-параметров нет. Неизвестные и повторные параметры отвергаются.
 
 ```http
 GET /insight-service/insights?kind=personal&limit=5&minImportance=3
@@ -31,7 +33,7 @@ id: canonical question/effect ID
 companyId, newsMaterialId, literalObjectRef
 currentRevision: {
   revisionId, previousRevisionId, newsVersionId, newsMaterialId?, asOf, createdAt,
-  conclusion, status, publicationClass?, question?, assessment?, trigger?, sourceRefs,
+  conclusion, status, category: "risk"|"opportunity"|"event"|null, publicationClass?, question?, assessment?, trigger?, sourceRefs,
   companyImportance: {score: 1..5|null, rationale, evidenceRefs} | null,
   impact: {metric, amountBasis, economicObjectId, evidenceStatus} | null
 }
@@ -54,7 +56,7 @@ companyId, newsMaterialId, newsVersionId, asOf, updatedAt
 textCompleteness: "full" | "lead" | "unknown"
 companyStatus: "completed" | "failed" | "pending"
 requiresReassessment: null
-insight: {title, conclusion, mechanism, applicability[], exclusions[], unknowns[], sourceRefs[], signalIds?, quality?}
+insight: {title, conclusion, mechanism, category: "risk"|"opportunity"|"event"|null, applicability[], exclusions[], unknowns[], sourceRefs[], signalIds?, quality?}
 sources, indicators: [], indicatorAvailability
 ```
 
@@ -116,20 +118,31 @@ X-Internal-Secret: <service-only>
 
 Новая реализация — owner API в InsightService. Существующие repository/SQL/cursors переиспользованы локально, без self-HTTP; новая БД, миграция и повторная генерация не нужны. `MaterialVersion` дополнен optional nullable provenance, отсутствующее поле не сериализуется и не меняет старые canonical payloads.
 
-Source-кандидат отдельно от ingress/deployment. Gateway сейчас не маршрутизирует эти новые public reads. Подготовленный конфиг должен добавить только GET/HEAD для `/insight-service/insights` и вложенных путей в private InsightService; `/insight-service/internal/*` не открывается. JWT проверяет существующий Gateway, который заменяет пользовательские identity headers. Insight guard требует один canonical UUID `X-User-Id` до query/DB/source reads. Внутренний secret не заменяет user identity. Сам header не является проверкой JWT при прямом доступе; сервис должен оставаться внутри доверенной сети.
+Source-кандидат отдельно от ingress/deployment. Gateway сейчас не маршрутизирует эти новые public reads. Подготовленный конфиг добавляет только GET/HEAD для трёх точных форм путей из таблицы выше в private InsightService, без catch-all; `/insight-service/internal/*` не открывается. JWT проверяет существующий Gateway, который заменяет пользовательские identity headers. Insight guard требует один canonical UUID `X-User-Id` до query/DB/source reads. Внутренний secret не заменяет user identity. Сам header не является проверкой JWT при прямом доступе; сервис должен оставаться внутри доверенной сети.
 
 ### Согласованный cutover и breaking change
 
 1. Выполнить native build/regression и public contract smoke Insight внутри разрешённого существующего контура.
-2. Отдельно подтвердить и применить узкий Gateway ingress, проверить Bearer/replaced identity, current membership, source scope и реальные HTTP DTO через внешний origin.
+2. После успешных проверок remote-исполнитель применяет согласованный узкий Gateway ingress, проверяет Bearer/replaced identity, current membership, source scope и реальные HTTP DTO через внешний origin.
 3. В согласованном релизном окне переключить frontend base path и выпустить Agent removal candidate.
 4. Проверить, что старые Agent paths отвечают 404 и отсутствуют в Agent OpenAPI. Alias, redirect и fallback не добавляются.
 
 Breaking change: **вместо старого `/agent-service/insights…` использовать `/insight-service/insights…`**. Существующие IDs, query и непрозрачные cursors не пересоздаются. Не удалять работающие Agent routes до новых smoke; после cutover не оставлять их как legacy API. Rollback — восстановление сохранённых предыдущих версий согласованного релиза, не постоянный public alias.
 
-### Отдельная category integration
+### Подтверждение будущего cutover
 
-Текущий base `2f3a4e40` ещё не содержит frozen shared category contract из `feat/insight-category` (`7720106`). Legacy `currentRevision.category` и `insight.category` остаются null; classification не выводится из знака эффекта. До cutover нужно обычной согласованной интеграцией подключить shared nullable поле/политику в projection и category query filter в существующем repository. В этом candidate category query не рекламируется и отвергается как неизвестный. Test-only release guard после появления shared model требует сохранить известную stored category и не позволяет молча заменить её null. Category pipeline и frozen PR эта ветка не переписывает.
+Сохранённое поручение пользователя (оно не означает, что production уже изменён):
+
+> Реми: «Для переноса инсайтов дополнительно потребуется открыть в Gateway только новые GET/HEAD-маршруты с Bearer-проверкой и удалить старые из Agent. Разрешаешь это переключение после успешных проверок? Internal-ручки останутся закрыты.»
+> Пользователь: «да»
+
+Разрешение ограничено этим переключением после проверок. Internal routes, POST, публичные порты и credentials не меняются. Применение выполняет согласованный remote-исполнитель, не cloud source worker.
+
+### Интегрированный shared category contract
+
+Shared nullable поле и `InsightCategoryPolicy` из `7720106` интегрированы обычным merge без переписывания frozen веток. Personal `currentRevision.category`, history `items[].revision.category` и general `insight.category` сохраняют ровно записанное `risk|opportunity|event|null`; отсутствующее legacy значение остаётся null. Категория независима от `kind`, importance, evidence/status, источника и знака суммы. Неизвестная или смешанная направленность не превращается в event; inference и backfill отсутствуют. Подробная семантика: [insight-category.md](insight-category.md).
+
+Category filter применяется в существующем SQL до пагинации: к текущим personal revisions и к general insights только после выбора последнего разрешённого job для news/version. Старый matching job не воскрешается. Cursor связан с category вместе с прежними company/kind/filters; смена или удаление category при продолжении даёт 400. Нефильтрованные старые cursors сохраняют прежний четырёхэлементный filter key. Интеграционные тесты проверяют known/null projection и history, raw-query валидацию и смешанные cursors. Привязка категории теперь реализована в source candidate; native package gate и Gateway/ingress smoke по-прежнему pending до фактической проверки.
 
 ### Проверки и честные ограничения
 
@@ -145,3 +158,5 @@ dotnet publish Api/InsightService.Api.csproj -c Release --no-restore -o ./publis
 Full existing PostgreSQL regression suite требует заранее разрешённый synthetic `INSIGHT_TEST_POSTGRES` fixture по инструкции проекта; в рамках cloud-переноса новые PostgreSQL/Compose/environments не создаются. Native release gate и ingress smoke до их фактического запуска остаются pending.
 
 Swagger Insight: opt-in `/insight-service/swagger/index.html`, spec `/insight-service/swagger/v1/swagger.json`; public Bearer и internal secret описаны раздельно. Документация не расширяет доступ. Agent Swagger после cutover больше не содержит insight read paths.
+
+Не реализованы write-actions/deepen/feedback/assignment, general revision history/current invalidation tracking, persona адаптация (ждём контракт Артёма), нормализованный UI status enum и общие bank-position labels. Обсудить карточку можно существующим чатом текстом со стабильным ID; структурированная card-action admission в этот slice не добавлена.

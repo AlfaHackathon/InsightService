@@ -121,6 +121,11 @@ internal static class AnalysisRequestNormalizer
                 return new(new Error("A bounded literal object, conclusion, status and 1-64 source references are required.", ErrorSource.Client, ErrorType.CorruptedInfo) { HttpStatusCode = HttpStatusCode.BadRequest });
             }
 
+            if (!InsightCategoryPolicy.IsValid(draft.Category))
+            {
+                return new(new Error("category must be risk, opportunity, event or null.", ErrorSource.Client, ErrorType.CorruptedInfo) { HttpStatusCode = HttpStatusCode.BadRequest });
+            }
+
             if (CompanyImportancePolicy.ShapeError(draft) is { } importanceError)
             {
                 return new(importanceError);

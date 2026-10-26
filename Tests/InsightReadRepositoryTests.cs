@@ -39,7 +39,10 @@ public sealed class InsightReadRepositoryTests : IDisposable
         await InsightReadTestData.Personal(database);
         var matching = await Reads().PersonalPage(InsightReadTestData.Company, new()
         {
-            Status = "unknown", Mechanism = "liquidity", NewsMaterialId = "current-news", MinImportance = 4
+            Status = "unknown",
+            Mechanism = "liquidity",
+            NewsMaterialId = "current-news",
+            MinImportance = 4
         });
         Assert.Equal("q-a", Assert.Single(matching.Items).Id);
         Assert.Empty((await Reads().PersonalPage(InsightReadTestData.Company, new() { MinImportance = 5 })).Items);
@@ -156,6 +159,33 @@ public sealed class InsightReadRepositoryTests : IDisposable
     {
         await Assert.ThrowsAsync<BadHttpRequestException>(() => Reads().PersonalPage(InsightReadTestData.Company, new() { Cursor = cursor }));
         await Assert.ThrowsAsync<BadHttpRequestException>(() => Reads().GeneralDetail(InsightReadTestData.Company, cursor));
+    }
+
+    [Fact]
+    public async Task CategoryFiltersCurrentPersonalRevisionsAndGeneralSnapshotsBeforePaginationAndBindsCursors()
+    {
+        await InsightReadTestData.Head(database, "risk-old", InsightReadTestData.Company, true,
+            InsightReadTestData.Revision("old") with { Category = "risk" },
+            InsightReadTestData.Revision("new") with { Category = "opportunity" });
+        await InsightReadTestData.Head(database, "legacy", InsightReadTestData.Company, false, InsightReadTestData.Revision("legacy"));
+        Assert.Empty((await Reads().PersonalPage(InsightReadTestData.Company, new() { Category = "risk" })).Items);
+        Assert.Equal("risk-old", Assert.Single((await Reads().PersonalPage(InsightReadTestData.Company, new() { Category = "opportunity" })).Items).Id);
+        Assert.Equal(2, (await Reads().PersonalPage(InsightReadTestData.Company, new())).Items.Count);
+        foreach (var id in new[] { "risk-one", "risk-two" })
+        {
+            await InsightReadTestData.Head(database, id, InsightReadTestData.Company, true, InsightReadTestData.Revision(id) with { Category = "risk" });
+        }
+        var personal = await Reads().PersonalPage(InsightReadTestData.Company, new() { Category = "risk", Limit = 1 });
+        Assert.NotNull(personal.NextCursor);
+        await Assert.ThrowsAsync<BadHttpRequestException>(() => Reads().PersonalPage(InsightReadTestData.Company, new() { Category = "event", Cursor = personal.NextCursor }));
+        await InsightReadTestData.Job(database, "risk-job", 10, [InsightReadTestData.Company], count: 3, category: "risk");
+        var page = await Reads().GeneralPage(InsightReadTestData.Company, new() { Category = "risk", Limit = 1 });
+        Assert.Single(page.Items);
+        Assert.NotNull(page.NextCursor);
+        await Assert.ThrowsAsync<BadHttpRequestException>(() => Reads().GeneralPage(InsightReadTestData.Company, new() { Category = "event", Cursor = page.NextCursor }));
+        await InsightReadTestData.Job(database, "mixed-newer", 20, [InsightReadTestData.Company]);
+        Assert.Empty((await Reads().GeneralPage(InsightReadTestData.Company, new() { Category = "risk" })).Items);
+        Assert.Null((await Reads().PersonalDetail(InsightReadTestData.Company, "legacy"))!.CurrentRevision.Category);
     }
 
     public void Dispose() => database.Dispose();

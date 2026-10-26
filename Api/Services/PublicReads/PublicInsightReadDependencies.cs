@@ -8,12 +8,12 @@ namespace InsightService.Services.PublicReads;
 
 public interface IPublicInsightMembershipResolver
 {
-    Task<PublicInsightMembership?> Get(Guid userId, CancellationToken ct);
+    Task<PublicInsightMembership?> GetAsync(Guid userId, CancellationToken ct);
 }
 
 public interface IPublicInsightSourceResolver
 {
-    Task<MaterialVersion?> Get(string materialId, string versionId, CancellationToken ct);
+    Task<MaterialVersion?> GetAsync(string materialId, string versionId, CancellationToken ct);
 }
 
 public interface IPublicInsightReadStore

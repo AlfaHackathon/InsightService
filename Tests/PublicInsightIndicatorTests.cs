@@ -154,7 +154,10 @@ public sealed class PublicInsightIndicatorTests
                     r = r with { Assessment = r.Assessment! with { Conditions = [new(excerpt, "budget_baseline", "supported", [own], "budget", "observed", [])] } };
                 }
                 if (cause == "budget-not-exact-excerpt")
+                {
                     r = r with { Assessment = r.Assessment! with { Conditions = [new("budget:2027 object L-123: amount 100 RUB", "budget_baseline", "supported", [own], "budget", "observed", [])] } };
+                }
+
                 break;
         }
         f.Personal = f.Personal! with { CurrentRevision = r };

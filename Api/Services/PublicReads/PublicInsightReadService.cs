@@ -21,13 +21,16 @@ public sealed class PublicInsightReadService(IPublicInsightMembershipResolver me
             var pending = references.GroupBy(reference => (reference.MaterialId, reference.VersionId)).Select(group => group.Last())
                 .Where(reference => !loaded.ContainsKey((reference.MaterialId, reference.VersionId))).ToArray();
             if (loaded.Count + pending.Length > 64)
+            {
                 throw PublicInsightReadException.Unavailable("SOURCE_READ_BUDGET");
+            }
+
             for (var offset = 0; offset < pending.Length; offset += 4)
             {
                 await Task.WhenAll(pending.Skip(offset).Take(4).Select(async reference =>
                 {
                     ct.ThrowIfCancellationRequested();
-                    var source = await resolver.Get(reference.MaterialId, reference.VersionId, ct).WaitAsync(ct)
+                    var source = await resolver.GetAsync(reference.MaterialId, reference.VersionId, ct).WaitAsync(ct)
                         ?? throw PublicInsightReadException.Unavailable("SOURCE_UNAVAILABLE");
                     PublicInsightValidation.Source(source);
                     loaded[(reference.MaterialId, reference.VersionId)] = source;
@@ -38,11 +41,17 @@ public sealed class PublicInsightReadService(IPublicInsightMembershipResolver me
         {
             if (!loaded.TryGetValue((reference.MaterialId, reference.VersionId), out var source) ||
                 source.MaterialId != reference.MaterialId || source.VersionId != reference.VersionId || source.ContentHash != reference.ContentHash || source.KnownAt > asOf)
+            {
                 throw PublicInsightReadException.Contract("SOURCE_IDENTITY_MISMATCH");
+            }
+
             var company = source.CompanyIds.Contains(membership.CompanyId) || source.Kind is "news" or "market" && source.CompanyIds.Length == 0;
             var bank = source.BankProfileIds.Length == 0 || membership.BankProfileId is not null && source.BankProfileIds.Contains(membership.BankProfileId, StringComparer.Ordinal);
             if (!company || !bank || publicOnly && (source.CompanyIds.Length != 0 || source.BankProfileIds.Length != 0 || source.Kind == "company"))
+            {
                 throw new SourceDenied();
+            }
+
             return source;
         }
     }
@@ -59,7 +68,8 @@ public sealed class PublicInsightReadService(IPublicInsightMembershipResolver me
             Status = query.Status,
             Mechanism = query.Mechanism,
             NewsMaterialId = query.NewsMaterialId,
-            MinImportance = query.MinImportance
+            MinImportance = query.MinImportance,
+            Category = query.Category
         };
         var cards = new List<PublicInsightCard>();
         string? cursor;
@@ -68,7 +78,10 @@ public sealed class PublicInsightReadService(IPublicInsightMembershipResolver me
             var page = await store.PersonalPage(scope.CompanyId, options, token).WaitAsync(token);
             Page(page, scope, query.Limit);
             foreach (var item in page.Items)
+            {
                 PersonalShape(item, scope, detail: false);
+            }
+
             await request.Load(page.Items.SelectMany(item => item.CurrentRevision.SourceRefs));
             foreach (var item in page.Items)
             {
@@ -122,14 +135,20 @@ public sealed class PublicInsightReadService(IPublicInsightMembershipResolver me
     {
         Id(id);
         if (query is null || query.Limit is < 1 or > 20 || query.Cursor?.Length > 2048)
+        {
             throw PublicInsightReadException.Invalid();
+        }
+
         var scope = await Scope(userId, token);
         var current = await store.PersonalDetail(scope.CompanyId, id, token).WaitAsync(token) ?? throw PublicInsightReadException.Missing();
         PersonalShape(current, scope, detail: true, id);
         var page = await store.PersonalHistory(scope.CompanyId, id, query.Limit, query.Cursor, token).WaitAsync(token) ?? throw PublicInsightReadException.Missing();
         Page(page, scope, query.Limit);
         foreach (var revision in page.Items)
+        {
             PublicInsightValidation.Revision(revision);
+        }
+
         var request = new Request(sources, token);
         await request.Load(current.CurrentRevision.SourceRefs.Concat(page.Items.SelectMany(revision => revision.SourceRefs)));
         try
@@ -149,9 +168,12 @@ public sealed class PublicInsightReadService(IPublicInsightMembershipResolver me
     private async Task<PublicInsightMembership> Scope(Guid userId, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
-        var scope = await memberships.Get(userId, ct).WaitAsync(ct);
+        var scope = await memberships.GetAsync(userId, ct).WaitAsync(ct);
         if (scope is null)
+        {
             throw new PublicInsightReadException(403, "COMPANY_MEMBERSHIP_REQUIRED", "Current company membership is required.");
+        }
+
         PublicInsightValidation.Require(scope.CompanyId != Guid.Empty, "INSIGHT_SCOPE_MISMATCH");
         return scope;
     }
@@ -163,7 +185,10 @@ public sealed class PublicInsightReadService(IPublicInsightMembershipResolver me
         if (item.CompanyId != scope.CompanyId || id is not null && item.Id != id)
         {
             if (detail)
+            {
                 throw PublicInsightReadException.Missing();
+            }
+
             throw PublicInsightReadException.Contract("INSIGHT_SCOPE_MISMATCH");
         }
     }
@@ -177,7 +202,10 @@ public sealed class PublicInsightReadService(IPublicInsightMembershipResolver me
         if (item.CompanyId != scope.CompanyId || id is not null && item.Id != id)
         {
             if (detail)
+            {
                 throw PublicInsightReadException.Missing();
+            }
+
             throw PublicInsightReadException.Contract("INSIGHT_SCOPE_MISMATCH");
         }
         return insight;
@@ -185,7 +213,10 @@ public sealed class PublicInsightReadService(IPublicInsightMembershipResolver me
     private static void Page<T>(InsightReadPage<T>? page, PublicInsightMembership scope, int limit)
     {
         if (page is null)
+        {
             throw PublicInsightReadException.Unavailable();
+        }
+
         PublicInsightValidation.Require(page.CompanyId == scope.CompanyId, "INSIGHT_SCOPE_MISMATCH");
         PublicInsightValidation.Require(page.Items is not null && page.Items.Count <= limit && page.NextCursor?.Length is not > 2048);
     }
@@ -197,7 +228,10 @@ public sealed class PublicInsightReadService(IPublicInsightMembershipResolver me
         var byIdentity = originals.GroupBy(source => (source.MaterialId, source.VersionId)).ToDictionary(group => group.Key, group => group.First());
         Task<Result<MaterialVersion>> Resolve(string material, string version) => Task.FromResult(new Result<MaterialVersion>(byIdentity[(material, version)], null));
         if ((await CompanyImportancePolicy.Validate(PublicInsightProjection.Draft(revision), scope.CompanyId, Resolve)).Error is not null)
+        {
             throw PublicInsightReadException.Contract("IMPORTANCE_EVIDENCE_MISMATCH");
+        }
+
         var indicators = await PublicInsightProjection.Indicators(revision, item.RequiresReassessment, originals, scope.CompanyId);
         return new(item.Id, scope.CompanyId, item.NewsMaterialId, item.LiteralObjectRef, PublicInsightProjection.Revision(revision), item.RequiresReassessment,
             originals.Select(PublicInsightProjection.Metadata).ToArray(), indicators.Items, indicators.Availability);
@@ -208,7 +242,10 @@ public sealed class PublicInsightReadService(IPublicInsightMembershipResolver me
         PublicInsightValidation.TryInstant(item.UpdatedAt, out var updatedAt);
         var originals = insight.SourceRefs.Select(reference => request.Source(InternalRef(reference), scope, asOf, publicOnly: true)).ToArray();
         if (!originals.Any(source => source.Kind == "news" && source.MaterialId == item.NewsMaterialId && source.VersionId == item.NewsVersionId))
+        {
             throw PublicInsightReadException.Contract("GENERAL_NEWS_ANCHOR");
+        }
+
         var indicators = PublicInsightProjection.Unavailable("general_not_company_calculation");
         return new(item.Id, scope.CompanyId, item.NewsMaterialId, item.NewsVersionId, asOf, updatedAt, item.TextCompleteness,
             item.CompanyStatus, insight, originals.Select(PublicInsightProjection.Metadata).ToArray(), indicators.Items, indicators.Availability);
@@ -217,23 +254,32 @@ public sealed class PublicInsightReadService(IPublicInsightMembershipResolver me
     private static void Id(string id)
     {
         if (!PublicInsightValidation.Text(id, 512))
+        {
             throw PublicInsightReadException.Invalid();
+        }
     }
     private static void Kind(string kind)
     {
         if (kind is not ("personal" or "general"))
+        {
             throw PublicInsightReadException.Invalid();
+        }
     }
     private static void FeedQuery(PublicInsightFeedQuery query)
     {
         if (query is null)
+        {
             throw PublicInsightReadException.Invalid();
+        }
+
         Kind(query.Kind);
-        if (query.Limit is < 1 or > 20 || query.Cursor?.Length > 2048 || query.Status is not null && !PublicInsightValidation.Text(query.Status, 100) ||
+        if (!InsightCategoryPolicy.IsValid(query.Category) || query.Limit is < 1 or > 20 || query.Cursor?.Length > 2048 || query.Status is not null && !PublicInsightValidation.Text(query.Status, 100) ||
             query.NewsMaterialId is not null && !PublicInsightValidation.Text(query.NewsMaterialId, 200) ||
             query.Mechanism is not null && !PublicInsightValidation.Mechanisms.Contains(query.Mechanism) || query.MinImportance is < 1 or > 5 ||
             query.Kind == "general" && (query.Status is not null || query.Mechanism is not null || query.MinImportance is not null))
+        {
             throw PublicInsightReadException.Invalid();
+        }
     }
     private static async Task<T> Run<T>(Func<CancellationToken, Task<T>> operation, CancellationToken ct)
     {

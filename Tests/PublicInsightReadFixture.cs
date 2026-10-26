@@ -60,12 +60,12 @@ internal sealed class PublicInsightReadFixture : IPublicInsightMembershipResolve
             rawCheckpoint = "PRIVATE-CHECKPOINT",
             companyImportance = new { score = 5 }
         }, AnalysisProtocol.Json));
-    public Task<PublicInsightMembership?> Get(Guid userId, CancellationToken ct)
+    public Task<PublicInsightMembership?> GetAsync(Guid userId, CancellationToken ct)
     {
         MembershipCalls++;
         return Task.FromResult(Membership);
     }
-    public async Task<MaterialVersion?> Get(string materialId, string versionId, CancellationToken ct)
+    public async Task<MaterialVersion?> GetAsync(string materialId, string versionId, CancellationToken ct)
     {
         Interlocked.Increment(ref SourceCalls);
         var active = Interlocked.Increment(ref Active);
@@ -73,13 +73,22 @@ internal sealed class PublicInsightReadFixture : IPublicInsightMembershipResolve
         do
         { seen = MaximumActive; } while (active > seen && Interlocked.CompareExchange(ref MaximumActive, active, seen) != seen);
         if (active == 4)
+        {
             FourSourcesStarted.TrySetResult(true);
+        }
+
         try
         {
             if (SourceGate is not null)
+            {
                 await SourceGate.Task.WaitAsync(ct);
+            }
+
             if (ThrowSource)
+            {
                 throw new HttpRequestException("PRIVATE upstream error");
+            }
+
             return Materials.GetValueOrDefault((materialId, versionId));
         }
         finally { Interlocked.Decrement(ref Active); }
@@ -89,7 +98,10 @@ internal sealed class PublicInsightReadFixture : IPublicInsightMembershipResolve
         StoreCalls++;
         Options = options;
         if (ThrowCursor)
+        {
             throw new Microsoft.AspNetCore.Http.BadHttpRequestException("PRIVATE invalid cursor");
+        }
+
         return Task.FromResult(MissingPage ? null! : new InsightReadPage<PersonalInsightRead>(company, PersonalItems ?? (Personal is null ? [] : [Personal]), NextCursor));
     }
     public Task<PersonalInsightRead?> PersonalDetail(Guid company, string id, CancellationToken ct) { StoreCalls++; return Task.FromResult(Personal); }

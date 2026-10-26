@@ -1,3 +1,4 @@
+using Microsoft.OpenApi.Any;
 using Microsoft.OpenApi.Models;
 using Swashbuckle.AspNetCore.SwaggerGen;
 
@@ -33,6 +34,7 @@ public static class SwaggerRegistration
             options.OperationFilter<PublicInsightOperationFilter>();
             options.SchemaFilter<PublicInsightSchemaFilter>();
             options.SchemaFilter<CompanyImportanceSchemaFilter>();
+            options.SchemaFilter<InsightCategorySchemaFilter>();
         });
         return services;
     }
@@ -71,6 +73,11 @@ public sealed class InternalSwaggerOperationFilter : IOperationFilter
                 Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "InternalSecret" }
             }] = Array.Empty<string>()
         }];
+        foreach (var parameter in operation.Parameters.Where(parameter => parameter.Name == "Category" || parameter.Name == "category"))
+        {
+            parameter.Schema.Enum = new List<IOpenApiAny> { new OpenApiString("risk"), new OpenApiString("opportunity"), new OpenApiString("event") };
+            parameter.Description = "Filter saved category for either personal or general insights. Omit for all, including legacy null. Bound to cursor.";
+        }
         operation.Responses.TryAdd("403", new OpenApiResponse { Description = "Missing or invalid configured internal credential." });
         operation.Responses.TryAdd("400", new OpenApiResponse { Description = "Invalid body/parameters. Domain errors may use errorMessage; middleware errors use code/message." });
         operation.Responses.TryAdd("503", new OpenApiResponse { Description = "Storage or upstream unavailable; no successful result is implied." });
