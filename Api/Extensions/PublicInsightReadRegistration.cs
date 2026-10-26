@@ -16,6 +16,10 @@ public static class PublicInsightReadRegistration
         services.AddScoped<IPublicInsightSourceResolver>(provider => provider.GetRequiredService<PublicInsightHttpClients>());
         services.AddScoped<IPublicInsightReadStore, LocalPublicInsightReadStore>();
         services.AddScoped<PublicInsightReadService>();
+        services.AddScoped<InsightUpdateSnapshot>();
+        services.AddScoped<InsightUpdateSocket>();
+        services.AddSingleton<InsightSocketLimits>();
+        services.AddSingleton<InsightConnectionTickets>();
         services.Configure<ApiBehaviorOptions>(options =>
         {
             var previous = options.InvalidModelStateResponseFactory;

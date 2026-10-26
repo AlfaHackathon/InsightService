@@ -150,6 +150,11 @@ public sealed class NewsJobRepository(IDapperContext context) : INewsJobReposito
             return new(new Error("This worker no longer owns the current job lease/version.", ErrorSource.Client, ErrorType.CorruptedInfo) { HttpStatusCode = HttpStatusCode.Conflict });
         }
 
+        if (InsightPlainTextPolicy.ValidateCheckpoint(update.Checkpoint, old.Checkpoint) is { } textError)
+        {
+            return new(textError);
+        }
+
         var next = old with
         {
             Status = update.Status,
