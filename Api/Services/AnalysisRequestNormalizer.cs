@@ -11,7 +11,7 @@ namespace InsightService.Services;
 
 internal static class AnalysisRequestNormalizer
 {
-    public static Result<(AnalysisRequest, PreparedDraft[])> Normalize(AnalysisRequest r, bool normalizeQuestions = true)
+    public static Result<(AnalysisRequest, PreparedDraft[])> Normalize(AnalysisRequest r, bool normalizeQuestions = true, bool legacyCalculatedConclusion = false)
     {
         if (r.CompanyId == Guid.Empty)
         {
@@ -250,7 +250,10 @@ internal static class AnalysisRequestNormalizer
                 normalizedDraft = normalizedDraft with
                 {
                     ModelExplanation = draft.ModelExplanation ?? draft.Conclusion,
-                    Conclusion = CalculatedConclusion(draft.Question.Frame, value!, calculation.Unit, calculation.Period, draft.LiteralObjectRef)
+                    // Historical hash compatibility only; never used for new admission or reads.
+                    Conclusion = legacyCalculatedConclusion
+                        ? QuestionIdentityPolicy.LegacyReceiptConclusion(draft.Question.Frame, value!, calculation.Unit, calculation.Period, draft.LiteralObjectRef)
+                        : draft.Conclusion
                 };
             }
 

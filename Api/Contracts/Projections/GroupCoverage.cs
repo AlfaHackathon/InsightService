@@ -12,5 +12,6 @@ public sealed class GroupCoverage
     public string[] UnrevisedEffectIds { get; set; } = [];
     public Guid[] EmptyCompanyIds { get; set; } = [];
     public Guid[] PartialContextCompanyIds { get; set; } = [];
+    public Guid[] UnassessedCompanyIds { get; set; } = [];
     public bool AggregationRuleConfirmed { get; set; }
 }

@@ -47,6 +47,45 @@ public sealed class PublicInsightReadTests
         }
     }
 
+    [Theory]
+    [InlineData("Расходы могут вырасти на 8000 RUB; проверьте условия договора.")]
+    [InlineData("Исторический технический текст: 800 RUB")]
+    public async Task FeedDetailAndHistoryKeepPersistedNarrativeVerbatim(string text)
+    {
+        var f = new PublicInsightReadFixture();
+        var revision = f.Personal!.CurrentRevision with { Conclusion = text };
+        f.Personal = f.Personal with { CurrentRevision = revision };
+        f.Revisions = [revision];
+        var service = f.Service();
+        var card = Assert.IsType<PublicPersonalInsightCard>(Assert.Single((await Feed(f)).Items));
+        Assert.Equal(text, card.CurrentRevision.Conclusion);
+        var detail = Assert.IsType<PublicPersonalInsightCard>(await service.Detail(PublicInsightReadFixture.User, "personal", f.Personal.Id, default));
+        Assert.Equal(text, detail.CurrentRevision.Conclusion);
+        var history = await service.History(PublicInsightReadFixture.User, f.Personal.Id, new(), default);
+        Assert.Equal(text, Assert.Single(history.Items).Revision.Conclusion);
+    }
+
+    [Fact]
+    public async Task HistoricalMissingDataHeadIsNotACardButItsScopedHistoryIsPreserved()
+    {
+        var f = new PublicInsightReadFixture();
+        var revision = f.Personal!.CurrentRevision with
+        {
+            Conclusion = "Недостаточно оснований.", Status = "unknown", Calculation = null, CalculationResult = null,
+            Impact = f.Personal.CurrentRevision.Impact! with { EvidenceStatus = "unknown" }, PublicationClass = "missing_data"
+        };
+        f.Personal = f.Personal with { CurrentRevision = revision };
+        f.Revisions = [revision];
+        var page = await Feed(f);
+        Assert.Empty(page.Items);
+        Assert.Equal("opaque-next", page.NextCursor);
+        Assert.Equal(0, f.SourceCalls);
+        await Error(() => f.Service().Detail(PublicInsightReadFixture.User, "personal", f.Personal.Id, default), 404);
+        var history = await f.Service().History(PublicInsightReadFixture.User, f.Personal.Id, new(), default);
+        Assert.Equal(revision.Conclusion, Assert.Single(history.Items).Revision.Conclusion);
+        Assert.Equal(revision, f.Personal.CurrentRevision);
+    }
+
     [Fact]
     public async Task EveryCallResolvesMembershipAndSourcesAfreshAndForwardsOnlyValidatedFilters()
     {

@@ -69,7 +69,7 @@ public sealed class PersistenceRegressionTests : IDisposable
         var repository = Effects();
         var company = Guid.NewGuid();
         var now = DateTimeOffset.UtcNow;
-        var firstDraft = new EffectDraft("existing", "contract", null, "first", "unknown", []);
+        var firstDraft = new EffectDraft("existing", "contract", null, "Synthetic known consequence", "forecast", []);
         var initial = new AnalysisRequest(company, null, "news", "v1", now, [firstDraft]);
         var saved = (await (repository.Save(initial, "hash-v1", [new(firstDraft, null)])).RequireContentAsync());
         var newDraft = firstDraft with

@@ -43,6 +43,7 @@ internal static partial class PublicInsightValidation
         Require(revision is not null);
         var r = revision!;
         Require(InsightCategoryPolicy.IsValid(r.Category));
+        Require(r.Title is null || Text(r.Title, InsightTitlePolicy.MaximumLength) && !string.IsNullOrWhiteSpace(r.Title) && !r.Title.Any(c => char.IsControl(c) || c is '\u2028' or '\u2029'));
         Require(Identifier(r.RevisionId) && (r.PreviousRevisionId is null || Identifier(r.PreviousRevisionId)) && Identifier(r.NewsVersionId) &&
             r.AsOf != default && r.CreatedAt != default && r.Conclusion is not null && Text(r.Status, 100) &&
             (r.NewsMaterialId is null || Identifier(r.NewsMaterialId)) &&

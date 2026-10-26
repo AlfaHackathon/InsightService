@@ -31,7 +31,7 @@ public sealed record PublicInsightRevision(string RevisionId, string? PreviousRe
     DateTimeOffset AsOf, string Conclusion, string Status, PublicInsightSourceRef[] SourceRefs, DateTimeOffset CreatedAt,
     PublicInsightImpact? Impact, PublicInsightImportance? CompanyImportance, string? NewsMaterialId,
     PublicInsightQuestion? Question, PublicInsightAssessment? Assessment, PublicInsightTrigger? Trigger,
-    string? PublicationClass, string? Category = null);
+    string? PublicationClass, string? Category = null, string? Title = null);
 public sealed record PublicInsightIndicator(string Name, string Metric, string Value, string Unit, string Period,
     string? BaselinePeriod, string EvidenceStatus, PublicInsightSourceRef[] SourceRefs, bool? ArithmeticOnly);
 public sealed record PublicIndicatorAvailability(string Reason, string Explanation);

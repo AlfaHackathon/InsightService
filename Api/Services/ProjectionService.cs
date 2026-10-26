@@ -35,6 +35,20 @@ public sealed class ProjectionService(
                 continue;
             }
             var receipt = stored.Receipt;
+            if (receipt.Outcome == "no_insight")
+            {
+                // Historical heads remain readable but are not new consequences of
+                // this news. Do not turn a diagnostic receipt into actionable facts.
+                companies.Add(new()
+                {
+                    CompanyId = run.CompanyId,
+                    Status = "completed",
+                    Receipt = receipt,
+                    ContextComplete = receipt.ContextComplete,
+                    StaleEffectIds = []
+                });
+                continue;
+            }
             var snapshot = await repository.GetSnapshot(run.CompanyId, receipt.NewsMaterialId, asOf);
             var heads = receipt.Effects.Where(e => e.CurrentRevision.AsOf <= asOf).ToDictionary(e => e.EffectId, StringComparer.Ordinal);
             foreach (var effect in snapshot.Effects)
@@ -61,13 +75,6 @@ public sealed class ProjectionService(
             {
                 ModelExplanation = null
             };
-            if (revision.Calculation is { } calculation && revision.CalculationResult is { } value)
-            {
-                revision = revision with
-                {
-                    Conclusion = QuestionIdentityPolicy.CalculatedConclusion(revision.Question?.Frame ?? "absolute", value, calculation.Unit, calculation.Period, "")
-                };
-            }
             return new CanonicalFact { CompanyId = c.CompanyId, EffectId = e.EffectId, Revision = revision, Priority = stale ? 0 : ProjectionPolicy.Priority(revision), RequiresReassessment = stale };
         }) ?? []).OrderByDescending(f => f.Priority).ToArray();
         return new(new CanonicalProjection { Companies = companies.ToArray(), Facts = facts }, null);

@@ -11,4 +11,6 @@ public sealed record EffectDraft(string EffectKey, string LiteralObjectRef, stri
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] QuestionAssessment? Assessment = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ModelExplanation = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] CompanyImportance? CompanyImportance = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Category = null);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Category = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] CalculationClaim? CalculationClaim = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Title = null);

@@ -9,6 +9,7 @@ using InsightService.Contracts.Analyses;
 using InsightService.Contracts.Questions;
 using InsightService.Contracts.SourceReactions;
 using InsightService.Models.Persistence;
+using InsightService.Models.Policies;
 using InsightService.Repositories.Interfaces;
 using InsightService.Repositories.Postgres;
 using InsightService.Resources;
@@ -76,7 +77,7 @@ public sealed class EffectRepository(IDapperContext context) : IEffectRepository
         }
 
         var saved = new List<SavedEffectResponse>(drafts.Count);
-        foreach (var item in drafts)
+        foreach (var item in drafts.Where(item => !AnalysisPublicationPolicy.IsDiagnostic(item.Draft)))
         {
             var draftSave = await EffectRevisionWriter.SaveDraft(transaction, request, item, completedAt);
             if (draftSave.Error is { } draftSaveError)
@@ -111,7 +112,9 @@ public sealed class EffectRepository(IDapperContext context) : IEffectRepository
             request.ContextComplete,
             unrevised,
             request.RetrievalTrace,
-            request.Trigger);
+            request.Trigger,
+            saved.Count == 0 ? "no_insight" : "insights_saved",
+            drafts.Where(item => AnalysisPublicationPolicy.IsDiagnostic(item.Draft)).Select(item => item.Draft).ToArray());
         await transaction.Command(new QueryObject(InsightSql.InsertAnalysisReceipt,
             new
             {

@@ -235,5 +235,17 @@ public sealed class PublicInsightOwnerMvcTests
             Assert.Equal(["risk", "opportunity", "event"], category.GetProperty("enum").EnumerateArray().Select(value => value.GetString()!).ToArray());
         }
         Assert.False(spec.GetProperty("paths").TryGetProperty("/agent-service/insights", out _));
+        var claim = schemas.GetProperty("CalculationClaim");
+        Assert.Contains("never rewritten", claim.GetProperty("description").GetString());
+        Assert.Equal(200, claim.GetProperty("properties").GetProperty("quote").GetProperty("maxLength").GetInt32());
+        Assert.Equal(4, claim.GetProperty("required").GetArrayLength());
+        Assert.True(schemas.GetProperty("EffectRevision").GetProperty("properties").TryGetProperty("calculationClaim", out _));
+        Assert.False(schemas.GetProperty("PublicInsightRevision").GetProperty("properties").TryGetProperty("calculationClaim", out _));
+        foreach (var type in new[] { "EffectRevision", "PublicInsightRevision" })
+        {
+            var title = schemas.GetProperty(type).GetProperty("properties").GetProperty("title");
+            Assert.True(title.GetProperty("nullable").GetBoolean());
+            Assert.Equal(180, title.GetProperty("maxLength").GetInt32());
+        }
     }
 }

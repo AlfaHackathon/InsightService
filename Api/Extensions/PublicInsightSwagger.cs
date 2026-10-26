@@ -72,6 +72,12 @@ public sealed class PublicInsightSchemaFilter : ISchemaFilter
             category.Nullable = true;
             category.Description = "Stored nullable category from the shared category contract. Absent remains null; never inferred from impact sign.";
         }
+        if (context.Type == typeof(PublicInsightRevision) && schema.Properties.TryGetValue("title", out var title))
+        {
+            title.Nullable = true;
+            title.MaxLength = 180;
+            title.Description = "Verbatim stored title of this revision. Legacy null has no generated fallback. Personal feed/detail use currentRevision.title; history uses each items[].revision.title. General insights keep insight.title.";
+        }
         if (context.Type == typeof(PublicInsightIndicator) && schema.Properties.TryGetValue("value", out var value))
         {
             value.Description = "Verbatim persisted Decimal result as a string. Missing is not zero; no browser-side recomputation.";

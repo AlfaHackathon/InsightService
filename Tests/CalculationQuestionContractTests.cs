@@ -14,7 +14,7 @@ public sealed class CalculationQuestionContractTests
     private readonly PreservationFixture fixture = PreservationFixture.Load();
     private AnalysisRequest Request()
     {
-        var request = fixture.First;
+        var request = fixture.CurrentFirst;
         var draft = request.Drafts[0];
         return request with
         {

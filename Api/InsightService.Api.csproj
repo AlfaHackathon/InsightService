@@ -8,6 +8,7 @@
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
   </PropertyGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="InsightService.Tests" />
     <PackageReference Include="AlfaHackaton.Result" Version="1.0.0" />
     <PackageReference Include="AlfaHackaton.Controllers" Version="1.4.1" />
     <PackageReference Include="AlfaHackaton.DapperContext" Version="1.2.0" />

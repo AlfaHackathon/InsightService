@@ -62,5 +62,6 @@ internal static class QuestionIdentityPolicy
         Regex.IsMatch(value,
                     @"^(?:unknown|(?:(?:from|budget|actual|previous):)?\d{4}(?:-(?:Q[1-4]|(?:0[1-9]|1[0-2])(?:-(?:0[1-9]|[12]\d|3[01]))?))?)$",
                     RegexOptions.CultureInvariant);
-    public static string CalculatedConclusion(string frame, string value, string unit, string period, string literal) => $"{(frame == "budget_delta" ? "Расчётное отклонение от бюджета (новое значение минус baseline)" : frame == "event_only" ? "Расчётное изменение от события" : "Расчётное абсолютное значение")}: {value} {unit}; период {period}; объект {literal}. Применимость определяется сохранёнными условиями и статусом основания. Расчёт не подтверждает фактическую оплату.";
+    // Never render this historical template: it reconstructs pre-upgrade receipt hashes only.
+    internal static string LegacyReceiptConclusion(string frame, string value, string unit, string period, string literal) => $"{(frame == "budget_delta" ? "Расчётное отклонение от бюджета (новое значение минус baseline)" : frame == "event_only" ? "Расчётное изменение от события" : "Расчётное абсолютное значение")}: {value} {unit}; период {period}; объект {literal}. Применимость определяется сохранёнными условиями и статусом основания. Расчёт не подтверждает фактическую оплату.";
 }

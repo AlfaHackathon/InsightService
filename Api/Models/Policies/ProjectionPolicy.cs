@@ -23,6 +23,7 @@ public static class ProjectionPolicy
     {
         var runs = companies.ToDictionary(c => c.CompanyId);
         var missing = group.CompanyIds.Where(id => !runs.TryGetValue(id, out var c) || c.Status != "completed").ToArray();
+        var unassessed = group.CompanyIds.Where(id => runs.TryGetValue(id, out var c) && c.Receipt?.UnpublishedDrafts is { Length: > 0 }).ToArray();
         var partial = group.CompanyIds.Where(id => !runs.TryGetValue(id, out var c) || c.ContextComplete != true).ToArray();
         var unrevised = group.CompanyIds.SelectMany(id => runs.TryGetValue(id, out var c) ? (c.Receipt?.UnrevisedEffectIds ?? []).Concat(c.StaleEffectIds ?? []) : []).ToArray();
         var empty = group.CompanyIds.Where(id => runs.TryGetValue(id, out var c) && c.Receipt?.Effects.Count == 0).ToArray();
@@ -79,7 +80,7 @@ public static class ProjectionPolicy
             var duplicateFrame = duplicates.Where(id => Related(revisions.GetValueOrDefault(id)?.Question, frame.Question)).ToArray();
             var absent = group.CompanyIds.Where(id => !frame.Companies.Contains(id) && (!runs.TryGetValue(id, out var run) || run.Receipt?.Effects.Any(e => SameFrameUnaffected(e.CurrentRevision, frame)) != true)).ToArray();
             var q = frame.Question;
-            var complete = group.Complete && missing.Length == 0 && partial.Length == 0 && empty.Length == 0 && unresolved.Length == 0 && duplicateFrame.Length == 0 && absent.Length == 0 &&
+            var complete = group.Complete && missing.Length == 0 && partial.Length == 0 && unassessed.Length == 0 && empty.Length == 0 && unresolved.Length == 0 && duplicateFrame.Length == 0 && absent.Length == 0 &&
                 (q is null || q.Basis is not (null or "unknown") && q.Unit != "unknown" && q.TargetPeriod != "unknown" && q.BaselinePeriod != "unknown");
             var sum = Sum(frame.Values);
             return new GroupTotal
@@ -96,7 +97,7 @@ public static class ProjectionPolicy
                 CompanyIds = frame.Companies.Distinct().ToArray()
             };
         }).ToArray() : [];
-        var coverageComplete = group.Complete && confirmed && partial.Length == 0 && missing.Length == 0 && unknown.Count == 0 && duplicates.Count == 0 && unrevised.Length == 0 && empty.Length == 0;
+        var coverageComplete = group.Complete && confirmed && partial.Length == 0 && unassessed.Length == 0 && missing.Length == 0 && unknown.Count == 0 && duplicates.Count == 0 && unrevised.Length == 0 && empty.Length == 0;
         return new()
         {
             GroupId = group.GroupId,
@@ -114,6 +115,7 @@ public static class ProjectionPolicy
                 UnrevisedEffectIds = unrevised,
                 EmptyCompanyIds = empty,
                 PartialContextCompanyIds = partial,
+                UnassessedCompanyIds = unassessed,
                 AggregationRuleConfirmed = confirmed
             },
             Totals = totals,

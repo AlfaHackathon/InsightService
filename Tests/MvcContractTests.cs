@@ -37,8 +37,11 @@ public sealed class MvcContractTests : IDisposable
         var time = DateTimeOffset.Parse("2026-10-25T00:00:00Z");
         var source = new InsightService.Contracts.Context.SourceRef("synthetic-own", "v1", new string('a', 64));
         var rating = new CompanyImportance(4, "Own operational dependency needs prompt review.", [source]);
-        var draft = new EffectDraft("importance", "company:" + company.ToString("D"), null, "Synthetic consequence", "unknown", [source],
-            Question: new("liquidity", "event_only", "qualitative", "2026-11", null, "qualitative"), CompanyImportance: rating, Category: "risk");
+        var draft = new EffectDraft("importance", "company:" + company.ToString("D"), null, "Synthetic own-company dependency requires review.", "observed", [source],
+            Impact: new("qualitative", "qualitative", null, "supported", 4, 0, 0),
+            Question: new("liquidity", "event_only", "qualitative", "2026-11", null, "qualitative"),
+            Assessment: new([], [], new("established", "documented_exposure", "The own document establishes an explicit company dependency.", [source], [])),
+            CompanyImportance: rating, Category: "risk", Title: "Важность изменения условий для компании");
         var saved = (await new EffectRepository(database.Context).Save(new(company, null, "news", "v1", time, [draft]), "synthetic-importance", [new(draft, null)])).RequireContent();
         using var factory = Factory();
         using var client = Authorized(factory);
