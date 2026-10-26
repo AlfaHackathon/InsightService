@@ -86,7 +86,7 @@ sources, indicators: [], indicatorAvailability
 
 ## Источники и ссылка на оригинал
 
-SourceMetadata: `{materialId,versionId,contentHash,sourceId,kind,title,knownAt,publishedAt,provenance}`. Provenance nullable: `{acquisition,sourceUrl,retrievedAt,textCompleteness,originVersionId}`. Полный текст, ACL arrays и internal locator не возвращаются. URL только из `MaterialVersion.provenance.sourceUrl`, только HTTP(S) без username/password; при отсутствии/неподходящем URL — null, из ID ничего не строится. Открытие ссылки фронтом не означает, что backend загрузил полный publisher original; lead/excerpt/unknown остаются такими.
+SourceMetadata: `{materialId,versionId,contentHash,sourceId,kind,title,url,newsId,knownAt,publishedAt,provenance}`. `url` — nullable подтверждённый URL exact material; `newsId` — nullable parser document ID, сейчас null, поскольку material contract его не содержит. Provenance nullable: `{acquisition,sourceUrl,retrievedAt,textCompleteness,originVersionId}`. Полный текст, ACL arrays и internal locator не возвращаются. `url` и совместимое `provenance.sourceUrl` берутся только из `MaterialVersion.provenance.sourceUrl`, только HTTP(S) без username/password, whitespace/control/backslash, максимум 4096 символов; при отсутствии/неподходящем URL — null, из ID ничего не строится. Открытие ссылки фронтом не означает, что backend загрузил полный publisher original; lead/excerpt/unknown остаются такими. Источники дедуплицируются по exact material/version после проверки каждого reference. См. [source links](insight-source-links.md).
 
 Точный существующий внутренний resolve:
 
@@ -95,7 +95,7 @@ GET /context-service/internal/material-versions/{materialId}/{versionId}
 X-Internal-Secret: <service-only>
 ```
 
-Для новости также существует внутренний `POST /context-service/internal/news/resolve` с `{newsMaterialId,newsVersionId,asOf}`. `assistant_read_news` и `assistant_read_original` уже возвращают `original.provenance.sourceUrl`. Эти внутренние endpoints не предназначены для браузера; фронт берёт ссылку из публичного `sources[].provenance.sourceUrl` после релиза facade. Bank position не выводится из AI-текста и отдельного искусственного bank-position поля здесь нет.
+Для новости также существует внутренний `POST /context-service/internal/news/resolve` с `{newsMaterialId,newsVersionId,asOf}`. `assistant_read_news` и `assistant_read_original` уже возвращают `original.provenance.sourceUrl`. Эти внутренние endpoints не предназначены для браузера; фронт берёт ссылку из публичного `sources[].url` (совместимое `sources[].provenance.sourceUrl` сохранено). Bank position не выводится из AI-текста и отдельного искусственного bank-position поля здесь нет.
 
 Перед выдачей каждой карточки Insight перечитывает точные версии источников и проверяет IDs/hash/knownAt<=saved asOf и текущий company/bank scope. Для general допускаются только публичные news/market без company/bank ACL и обязательный точный news anchor. Private-source карточка пропускается в feed; detail/history возвращают 404. Временная недоступность источника — ошибка, не успешная пустая лента.
 

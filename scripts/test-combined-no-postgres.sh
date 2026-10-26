@@ -17,6 +17,7 @@ classes=(
     CalculationNarrativeProjectionTests
     UnpublishedAnalysisTests
     PublicInsightReadTests
+    PublicInsightSourceLinkTests
     PublicInsightIndicatorTests
     PublicInsightOwnerMvcTests
     PublicInsightHttpClientTests
