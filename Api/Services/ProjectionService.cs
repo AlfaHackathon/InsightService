@@ -39,8 +39,14 @@ public sealed class ProjectionService(
             {
                 // Historical heads remain readable but are not new consequences of
                 // this news. Do not turn a diagnostic receipt into actionable facts.
-                companies.Add(new() { CompanyId = run.CompanyId, Status = "completed", Receipt = receipt,
-                    ContextComplete = receipt.ContextComplete, StaleEffectIds = [] });
+                companies.Add(new()
+                {
+                    CompanyId = run.CompanyId,
+                    Status = "completed",
+                    Receipt = receipt,
+                    ContextComplete = receipt.ContextComplete,
+                    StaleEffectIds = []
+                });
                 continue;
             }
             var snapshot = await repository.GetSnapshot(run.CompanyId, receipt.NewsMaterialId, asOf);
