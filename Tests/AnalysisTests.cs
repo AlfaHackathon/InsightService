@@ -23,6 +23,22 @@ public sealed class AnalysisTests : IDisposable
     private static Calculation Cost(string delta) => new(new("multiply", Left: Value(delta), Right: Value("104")), "RUB", "Synthetic planned acceptance");
     private AnalysisRequest Request(string version = "v1", string? prior = null, string delta = "150") => new(company, "U_97", "news", version, now.AddHours(1), [new("lot-1", "contract-1/lot-1", prior, "Synthetic expected additional cost", "planned", [new("news", version, Hash), new("contract", "v1", Hash)], Cost(delta))]);
     [Fact]
+    public async Task CategoryIsSavedPerRevisionAndNeverBackfilledFromTheCurrentHead()
+    {
+        var firstRequest = Request();
+        firstRequest = firstRequest with { Drafts = [firstRequest.Drafts[0] with { Category = "risk" }] };
+        var first = (await Service().Save(firstRequest)).RequireContent();
+        var next = Request("v2", first.Effects.Single().RevisionId);
+        next = next with { Drafts = [next.Drafts[0] with { Category = "opportunity" }] };
+        var second = (await Service().Save(next)).RequireContent();
+        var stored = (await Service().GetEffect(second.Effects.Single().EffectId)).RequireContent();
+        Assert.Equal("opportunity", stored.CurrentRevision.Category);
+        Assert.Equal(new[] { "risk", "opportunity" }, stored.History.Select(revision => revision.Category).ToArray());
+        Assert.True((await Service().Save(firstRequest)).RequireContent().Duplicate);
+        Assert.Equal("opportunity", (await Service().GetEffect(stored.EffectId)).RequireContent().CurrentRevision.Category);
+    }
+
+    [Fact]
     public async Task CorrectionIsSameEffectWithTwoRevisionsAndRepeatDoesNotRevertHead()
     {
         var firstRequest = Request();

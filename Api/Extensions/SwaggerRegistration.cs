@@ -1,3 +1,4 @@
+using Microsoft.OpenApi.Any;
 using Microsoft.OpenApi.Models;
 using Swashbuckle.AspNetCore.SwaggerGen;
 
@@ -11,9 +12,9 @@ public static class SwaggerRegistration
         {
             options.SwaggerDoc("v1", new OpenApiInfo
             {
-                Title = "InsightService internal API",
+                Title = "InsightService API",
                 Version = "v1",
-                Description = "Service-to-service API. Documentation does not grant access. This service exposes internal routes; the client-facing current-company read facade belongs to AgentService. Never place an internal credential in frontend code."
+                Description = "Current-company public insight reads use Bearer through AuthGateway. Internal execution routes require a service credential and are not public frontend APIs. Documentation does not grant access; never place an internal credential in frontend code."
             });
             options.AddSecurityDefinition("InternalSecret", new OpenApiSecurityScheme
             {
@@ -22,8 +23,18 @@ public static class SwaggerRegistration
                 Name = "X-Internal-Secret",
                 Description = "Configured service credential; user Bearer tokens do not authorize internal routes."
             });
+            options.AddSecurityDefinition("GatewayBearer", new OpenApiSecurityScheme
+            {
+                Type = SecuritySchemeType.Http,
+                Scheme = "bearer",
+                BearerFormat = "JWT",
+                Description = "External Bearer validated by AuthGateway. InsightService requires trusted gateway identity and private ingress; it does not accept client-selected company scope."
+            });
             options.OperationFilter<InternalSwaggerOperationFilter>();
+            options.OperationFilter<PublicInsightOperationFilter>();
+            options.SchemaFilter<PublicInsightSchemaFilter>();
             options.SchemaFilter<CompanyImportanceSchemaFilter>();
+            options.SchemaFilter<InsightCategorySchemaFilter>();
         });
         return services;
     }
@@ -38,7 +49,7 @@ public static class SwaggerRegistration
         app.UseSwaggerUI(options =>
         {
             options.RoutePrefix = "insight-service/swagger";
-            options.SwaggerEndpoint("v1/swagger.json", "InsightService internal API v1");
+            options.SwaggerEndpoint("v1/swagger.json", "InsightService API v1");
             options.ConfigObject.ValidatorUrl = null;
         });
         return app;
@@ -62,6 +73,11 @@ public sealed class InternalSwaggerOperationFilter : IOperationFilter
                 Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "InternalSecret" }
             }] = Array.Empty<string>()
         }];
+        foreach (var parameter in operation.Parameters.Where(parameter => parameter.Name == "Category" || parameter.Name == "category"))
+        {
+            parameter.Schema.Enum = new List<IOpenApiAny> { new OpenApiString("risk"), new OpenApiString("opportunity"), new OpenApiString("event") };
+            parameter.Description = "Filter saved category for either personal or general insights. Omit for all, including legacy null. Bound to cursor.";
+        }
         operation.Responses.TryAdd("403", new OpenApiResponse { Description = "Missing or invalid configured internal credential." });
         operation.Responses.TryAdd("400", new OpenApiResponse { Description = "Invalid body/parameters. Domain errors may use errorMessage; middleware errors use code/message." });
         operation.Responses.TryAdd("503", new OpenApiResponse { Description = "Storage or upstream unavailable; no successful result is implied." });

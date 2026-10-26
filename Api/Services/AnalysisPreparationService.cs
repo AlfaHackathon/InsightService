@@ -259,7 +259,17 @@ public sealed class AnalysisPreparationService(
                 ExpectedPreviousRevisionId = existing?.CurrentRevision.RevisionId
             });
         }
-        return new(new DraftPreparationResponse { Drafts = drafts.ToArray() }, null);
+        var preparedDrafts = drafts.ToArray();
+        // Validate the complete prepared batch with the same contract used by Save.
+        // Keep preparation read-only and preserve its response fields: normalization
+        // here is validation, not permission to rewrite a model's dates or units.
+        var normalization = AnalysisRequestNormalizer.Normalize(request with { Drafts = preparedDrafts });
+        if (normalization.Error is { } validationError)
+        {
+            return new(new Error(validationError.Title ?? "Analysis request validation failed.", ErrorSource.Client, ErrorType.CorruptedInfo)
+            { HttpStatusCode = HttpStatusCode.UnprocessableEntity });
+        }
+        return new(new DraftPreparationResponse { Drafts = preparedDrafts }, null);
     }
 
     public async Task<Result<object>> DepthAsync(DepthRequest input, CancellationToken ct)

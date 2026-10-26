@@ -38,13 +38,14 @@ public sealed class MvcContractTests : IDisposable
         var source = new InsightService.Contracts.Context.SourceRef("synthetic-own", "v1", new string('a', 64));
         var rating = new CompanyImportance(4, "Own operational dependency needs prompt review.", [source]);
         var draft = new EffectDraft("importance", "company:" + company.ToString("D"), null, "Synthetic consequence", "unknown", [source],
-            Question: new("liquidity", "event_only", "qualitative", "2026-11", null, "qualitative"), CompanyImportance: rating);
+            Question: new("liquidity", "event_only", "qualitative", "2026-11", null, "qualitative"), CompanyImportance: rating, Category: "risk");
         var saved = (await new EffectRepository(database.Context).Save(new(company, null, "news", "v1", time, [draft]), "synthetic-importance", [new(draft, null)])).RequireContent();
         using var factory = Factory();
         using var client = Authorized(factory);
         var effect = saved.Effects.Single();
         var detail = (await client.GetFromJsonAsync<JsonElement>($"/insight-service/internal/effects/{effect.EffectId}"));
         Assert.Equal(4, detail.GetProperty("currentRevision").GetProperty("companyImportance").GetProperty("score").GetInt32());
+        Assert.Equal("risk", detail.GetProperty("currentRevision").GetProperty("category").GetString());
         Assert.Equal(rating.Rationale, detail.GetProperty("history")[0].GetProperty("companyImportance").GetProperty("rationale").GetString());
         var snapshot = await client.GetFromJsonAsync<JsonElement>($"/insight-service/internal/effects?companyId={company:D}&newsMaterialId=news");
         Assert.Equal(4, snapshot.GetProperty("effects")[0].GetProperty("currentRevision").GetProperty("companyImportance").GetProperty("score").GetInt32());
@@ -52,6 +53,10 @@ public sealed class MvcContractTests : IDisposable
         Assert.Equal(HttpStatusCode.OK, projected.StatusCode);
         var facts = (await projected.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("facts");
         Assert.Equal(4, facts[0].GetProperty("revision").GetProperty("companyImportance").GetProperty("score").GetInt32());
+        Assert.Equal("risk", facts[0].GetProperty("revision").GetProperty("category").GetString());
+        using var invalid = await client.PostAsJsonAsync("/insight-service/internal/analyses", new AnalysisRequest(company, null, "news", "v2", time,
+            [draft with { Category = "unknown", CompanyImportance = null }]));
+        Assert.Equal(HttpStatusCode.BadRequest, invalid.StatusCode);
     }
 
     [Fact]

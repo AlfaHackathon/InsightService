@@ -172,5 +172,7 @@ Default is disabled. UI: `/insight-service/swagger/index.html`; OpenAPI: `/insig
 Swagger UI assets are served locally by the existing Swashbuckle dependency of `AlfaHackaton.Controllers`; no CDN or new package is used.
 The specification is generated from controller routes and request contracts. Internal operations are tagged and require `X-Internal-Secret`; a user Bearer token does not authorize them.
 Some `IActionResult` responses have no declared payload metadata: consult their contracts; an absent response schema is not an empty-result guarantee.
-No public insight/source facade, network route/port, authentication, or CORS policy is added. Existing internal middleware still enforces access.
+Public insight reads now belong to InsightService; see `docs/public-insight-read.md` for the source-only owner migration and breaking cutover. Existing internal middleware remains separate. No Gateway/network port/CORS policy is applied by this source change.
 Only enable docs on an intended existing ingress/internal origin; this flag does not publish the service or change gateway routing. Do not embed credentials in frontend code or specs.
+
+Owner read source migration adds `/insight-service/insights` (feed), `/{kind}/{id}` (detail) and `/personal/{id}/history`; publication requires the separate Gateway/identity smoke and coordinated Agent removal described in [the contract](docs/public-insight-read.md).
