@@ -1,0 +1,22 @@
+{
+  "materialId": "news-1111111111111111111111111111111111111111",
+  "versionId": "v-2222222222222222222222222222222222222222",
+  "sourceId": "Tass",
+  "kind": "news",
+  "title": "Synthetic publisher announcement",
+  "text": "Synthetic lead from the parser. No private data.",
+  "knownAt": "2026-10-25T00:00:00.0000001Z",
+  "publishedAt": "2026-10-24T12:00:00Z",
+  "correctsVersionId": null,
+  "companyIds": [],
+  "bankProfileIds": [],
+  "contentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "provenance": {
+    "acquisition": "event_payload",
+    "sourceUrl": "https://publisher.example.test/economy/123?from=feed&lang=ru#original",
+    "retrievedAt": "2026-10-25T00:00:00.0000001Z",
+    "textCompleteness": "lead",
+    "originVersionId": null,
+    "locator": "publisher-123"
+  }
+}

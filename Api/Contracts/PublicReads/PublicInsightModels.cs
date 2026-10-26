@@ -8,7 +8,8 @@ public sealed record PublicInsightSourceRef(string MaterialId, string VersionId,
 public sealed record PublicInsightProvenance(string Acquisition, string? SourceUrl, DateTimeOffset RetrievedAt,
     string TextCompleteness, string? OriginVersionId);
 public sealed record PublicInsightSource(string MaterialId, string VersionId, string ContentHash, string SourceId,
-    string Kind, string Title, DateTimeOffset KnownAt, DateTimeOffset? PublishedAt, PublicInsightProvenance? Provenance);
+    string Kind, string Title, DateTimeOffset KnownAt, DateTimeOffset? PublishedAt, PublicInsightProvenance? Provenance,
+    string? Url = null, string? NewsId = null);
 public sealed record PublicInsightImportance(
     [property: Range(1, 5)] int? Score,
     [property: Required, MinLength(1), MaxLength(2000)] string Rationale,

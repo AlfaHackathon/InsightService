@@ -10,6 +10,26 @@ using Xunit;
 public sealed class PublicInsightHttpClientTests
 {
     [Fact]
+    public async Task ActualAdmissionMaterialShapeRetainsUrlAndPrivateLocatorForAuthorizedProjection()
+    {
+        var material = PublicInsightSourceLinkTests.News();
+        var handler = new Handler(_ => new(HttpStatusCode.OK)
+        {
+            Content = new StringContent(
+            File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Fixtures", "source-link-material.json")), Encoding.UTF8, "application/json")
+        });
+        var source = await Client(handler).GetAsync(material.MaterialId, material.VersionId, default);
+        Assert.NotNull(source);
+        Assert.Equal(material.MaterialId, source.MaterialId);
+        Assert.Equal(material.VersionId, source.VersionId);
+        Assert.Equal(material.ContentHash, source.ContentHash);
+        Assert.Equal(material.KnownAt, source.KnownAt);
+        Assert.Equal(material.Provenance, source.Provenance);
+        Assert.Equal("publisher-123", source.Provenance!.Locator);
+        Assert.Equal(material.Provenance!.SourceUrl, source.Provenance.SourceUrl);
+    }
+
+    [Fact]
     public async Task MembershipUsesOperationalOwnerAndOnlyServerCredential()
     {
         var user = Guid.NewGuid();
