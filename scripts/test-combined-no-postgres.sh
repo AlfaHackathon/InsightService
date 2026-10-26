@@ -12,6 +12,7 @@ classes=(
     InsightUpdateTransportTests
     InsightWebSocketPublicationIntegrationTests
     InsightTitleTests
+    InsightPlainTextTests
     CalculationNarrativeTests
     CalculationNarrativeServiceTests
     CalculationNarrativeProjectionTests
