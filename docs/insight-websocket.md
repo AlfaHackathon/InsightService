@@ -55,3 +55,22 @@ Linked-source harness отдельно от production projects компилир
 Cloud result 2026-10-26: linked Release build/test PASS, **114 passed / 0 failed / 0 skipped**: 24 WebSocket/ticket tests, 16 Gateway tests, 74 existing public-read regressions. SDK 10.0.403/runtime 10.0.14; TestServer 10.0.13, public JWT library 8.14.0. Diff whitespace checks PASS. Два независимых review (spec/standards) закрыты после исправления heartbeat starvation и hostile duplicate-ticket protocol exception. Native restore обоих репозиториев — BLOCKED 403; native build/publish не подтверждены.
 
 Root gates: интегрировать narrative PR #13 без отката, native restore/build/tests/publish, затем координированный deploy обоих сервисов. Проверить снаружи HTTPS/WSS: authenticated ticket, anonymous ticket denial, real JWT expiry, ticket replay/TTL, company/bank switch, source denial, корректный upgrade/heartbeat/reconnect GET и отсутствие internal/wildcard route. Production здесь не менялся.
+
+## Combined candidate: title / narrative / no_insight / WebSocket
+
+Отдельная ветка `codex/insight-websocket-narrative-combined-20261026` содержит frozen PR #13 head `e13726d439c1fed3122533613b98caae1c8577d6` (включая format-only native IDE0055 fix) и frozen PR #14 head `5fb788e564470bf56e30caf3603c861f1cb343eb`. Исходные heads не переписывались. Gateway PR #4 остаётся отдельным candidate `25d0c7330b015f1252d15f818eabdd0ea39a2d4f`; source protocol тот же.
+
+Combined test `InsightWebSocketPublicationIntegrationTests` проверяет отсутствие событий для всех скрытых public projection diagnostic heads, в том числе кандидата, захваченного до смены видимости; сохранение source ACL; nullable legacy title; совпадение event `revisionId` с `currentRevision.revisionId` и title из feed/detail/history. Title/body в event не добавлены: frontend перечитывает соответствующую ревизию через GET.
+
+Native-safe subset перечислен явно в `scripts/test-combined-no-postgres.sh`: только 16 классов с pure/fake/TestServer fixtures, без `PgTestDatabase`. Не использовать широкий фильтр `CalculationNarrative`/`InsightTitle`/`UnpublishedAnalysis`, который захватит persistence tests. Скрипт имеет `--no-build --no-restore`; сначала выполнить разрешённые native restore/build:
+
+```sh
+dotnet restore InsightService.slnx --configfile NuGet.config
+dotnet build InsightService.slnx -c Release --no-restore
+./scripts/test-combined-no-postgres.sh
+dotnet publish Api/InsightService.Api.csproj -c Release --no-restore -o ./publish
+```
+
+В cloud combined native restore повторно завершился `NU1301 / proxy 403` организационного feed. Это не approval denial и не успешный native build; package gate должен выполнить разрешённый remote executor. Отдельный расширенный linked harness выполняет настоящие AnalysisService/Preparation/Normalizer/Projection и public read/WS source с явными fakes организационных пакетов/repository и недоступных external transports. Его TestServer/policy tests не запускают БД, отдельное app environment или LLM; это не подтверждение native packages. Расширенный linked прогон: **186 passed / 0 failed / 0 skipped**. Whitespace formatter для включённых production WS/Projection файлов и native-safe filter source audit — PASS.
+
+Combined integration уже включает PR #13, поэтому root не должен разворачивать старый WS-only tree поверх нового core. Native gates и deploy combined Insight + согласованного Gateway выполняет только remote executor; core rollout не требуется задерживать ради WS.
