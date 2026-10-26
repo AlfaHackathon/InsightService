@@ -82,8 +82,11 @@ public sealed class PublicInsightReadService(IPublicInsightMembershipResolver me
                 PersonalShape(item, scope, detail: false);
             }
 
-            await request.Load(page.Items.SelectMany(item => item.CurrentRevision.SourceRefs));
-            foreach (var item in page.Items)
+            // Keep the underlying cursor: historical missing-data rows are internal
+            // diagnostics, not client cards, even though their history remains intact.
+            var visible = page.Items.Where(item => Publishable(item.CurrentRevision)).ToArray();
+            await request.Load(visible.SelectMany(item => item.CurrentRevision.SourceRefs));
+            foreach (var item in visible)
             {
                 try
                 { cards.Add(await Personal(item, scope, request)); }
@@ -120,6 +123,10 @@ public sealed class PublicInsightReadService(IPublicInsightMembershipResolver me
             {
                 var item = await store.PersonalDetail(scope.CompanyId, id, token).WaitAsync(token) ?? throw PublicInsightReadException.Missing();
                 PersonalShape(item, scope, detail: true, id);
+                if (!Publishable(item.CurrentRevision))
+                {
+                    throw PublicInsightReadException.Missing();
+                }
                 await request.Load(item.CurrentRevision.SourceRefs);
                 return await Personal(item, scope, request);
             }
@@ -220,6 +227,10 @@ public sealed class PublicInsightReadService(IPublicInsightMembershipResolver me
         PublicInsightValidation.Require(page.CompanyId == scope.CompanyId, "INSIGHT_SCOPE_MISMATCH");
         PublicInsightValidation.Require(page.Items is not null && page.Items.Count <= limit && page.NextCursor?.Length is not > 2048);
     }
+    private static bool Publishable(EffectRevision revision) =>
+        revision.PublicationClass != "missing_data" && revision.Impact?.EvidenceStatus != "unknown" &&
+        !(revision.Impact is null && revision.Status == "unknown");
+
     private static async Task<PublicPersonalInsightCard> Personal(PersonalInsightRead item, PublicInsightMembership scope, Request request)
     {
         var revision = item.CurrentRevision;

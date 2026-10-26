@@ -35,6 +35,7 @@ public static class SwaggerRegistration
             options.SchemaFilter<PublicInsightSchemaFilter>();
             options.SchemaFilter<CompanyImportanceSchemaFilter>();
             options.SchemaFilter<InsightCategorySchemaFilter>();
+            options.SchemaFilter<CalculationClaimSchemaFilter>();
         });
         return services;
     }

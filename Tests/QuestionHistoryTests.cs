@@ -15,7 +15,7 @@ public sealed class QuestionHistoryTests : IDisposable
     private readonly DateTimeOffset at = DateTimeOffset.Parse("2026-10-22T12:00:00Z");
     private const string Hash = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     private AnalysisService Service() => new(new EffectRepository(database.Context), new Sources(at, company));
-    private AnalysisRequest Request(string news, string version, string? prior = null, string mechanism = "financing_cost") => new(company, null, news, version, at.AddHours(1), [new("question-" + mechanism, "company:" + company, prior, "Synthetic fixture: unknown contract terms", "unknown", [new(news, version, Hash)], Question: new(mechanism, "absolute", "RUB", "2026", null))]);
+    private AnalysisRequest Request(string news, string version, string? prior = null, string mechanism = "financing_cost") => new(company, null, news, version, at.AddHours(1), [new("question-" + mechanism, "company:" + company, prior, "Synthetic source correction requires review.", "observed", [new(news, version, Hash)], Impact: new("qualitative", "qualitative", null, "contradicted", 0, 0, 0), Question: new(mechanism, "absolute", "RUB", "2026", null))]);
     [Fact]
     public async Task RestrictedNewVersionCannotInvalidateAnotherCompanyThroughOldDependency()
     {
@@ -284,13 +284,14 @@ public sealed class QuestionHistoryTests : IDisposable
     }
 
     [Fact]
-    public async Task FinancialPresentationUsesCalculatedDecimalAndKeepsWrongModelDigitsOnlyInAudit()
+    public async Task FinancialPresentationRejectsWrongModelDigitsRatherThanReplacingTheNarrative()
     {
         var request = Request("news-a", "v1");
         var calculation = new Calculation(new("multiply", Left: new("value", "100"), Right: new("value", "80")), "RUB", "2026-11");
         var draft = request.Drafts[0] with
         {
             Conclusion = "Synthetic wrong model text: 800 RUB",
+            CalculationClaim = new("800 RUB", "800", "RUB", "2026-11"),
             Calculation = calculation,
             Question = request.Drafts[0].Question! with
             {
@@ -301,14 +302,14 @@ public sealed class QuestionHistoryTests : IDisposable
             Impact = new("expense_delta", "monthly_run_rate", "FixtureLoan", "supported", 1, 1, 1),
             Assessment = new([], [], new("established", "documented_exposure", "Synthetic own exposure", [new("contract", "v1", Hash)], []))
         };
-        var saved = (await (Service().Save(request with
-        {
-            Drafts = [draft]
-        })).RequireContentAsync()).Effects.Single().CurrentRevision;
+        var error = await ResultAssert.ErrorAsync(() => Service().Save(request with { Drafts = [draft] }));
+        Assert.StartsWith("CONCLUSION_CLAIM_VALUE_MISMATCH:", error.Title);
+        Assert.Empty((await Service().GetEffects(request.CompanyId, request.NewsMaterialId)).RequireContent());
+        var corrected = draft with { Conclusion = "Расходы могут вырасти на 8000 RUB за 2026-11. Проверьте условия договора.", CalculationClaim = new("8000 RUB", "8000", "RUB", "2026-11") };
+        var saved = (await Service().Save(request with { Drafts = [corrected] }).RequireContentAsync()).Effects.Single().CurrentRevision;
         Assert.Equal("8000", saved.CalculationResult);
-        Assert.Contains("8000 RUB", saved.Conclusion);
-        Assert.DoesNotContain("800 RUB", saved.Conclusion);
-        Assert.Equal(draft.Conclusion, saved.ModelExplanation);
+        Assert.Equal(corrected.Conclusion, saved.Conclusion);
+        Assert.Equal(corrected.CalculationClaim, saved.CalculationClaim);
     }
 
     [Fact]

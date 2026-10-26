@@ -238,7 +238,7 @@ public sealed class AnalysisPreparationService(
                 return new(Invalid());
             }
 
-            if (existing is not null)
+            if (existing is not null && !AnalysisPublicationPolicy.IsDiagnostic(prepared))
             {
                 var scope = await ReassessmentScopePolicy.IsIndependentUnknown(request, prepared, existing,
                     (materialId, versionId) => sources.GetAsync(materialId, versionId, CancellationToken.None));
@@ -268,6 +268,13 @@ public sealed class AnalysisPreparationService(
         {
             return new(new Error(validationError.Title ?? "Analysis request validation failed.", ErrorSource.Client, ErrorType.CorruptedInfo)
             { HttpStatusCode = HttpStatusCode.UnprocessableEntity });
+        }
+        foreach (var item in normalization.Content.Item2)
+        {
+            if (CalculationClaimPolicy.Validate(item.Draft, item.CalculationResult) is { } claimError)
+            {
+                return new(claimError);
+            }
         }
         return new(new DraftPreparationResponse { Drafts = preparedDrafts }, null);
     }

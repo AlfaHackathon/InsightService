@@ -161,6 +161,11 @@ public sealed class PublicInsightIndicatorTests
                 break;
         }
         f.Personal = f.Personal! with { CurrentRevision = r };
+        if (cause == "unknown-status")
+        {
+            Assert.Empty((await f.Service().Feed(PublicInsightReadFixture.User, new(), default)).Items);
+            return; // Missing-data heads are diagnostics, not cards with an absent indicator.
+        }
         var card = await Card(f);
         Assert.Empty(card.Indicators);
         Assert.Equal(expected, card.IndicatorAvailability.Reason);

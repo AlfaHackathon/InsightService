@@ -282,12 +282,13 @@ public sealed class JobProjectionService(
                 failedCompanyIds = checkpoint.Companies.Where(c => c.Status == "failed").Select(c => c.CompanyId).ToArray(),
                 missingPersonIds = scope.MissingPersonIds,
                 unrevisedEffectIds = analyzed.SelectMany(c => c.Receipt?.UnrevisedEffectIds ?? []).ToArray(),
+                unassessedCompanyIds = analyzed.Where(c => c.Receipt?.UnpublishedDrafts is { Length: > 0 }).Select(c => c.CompanyId).ToArray(),
                 staleEffectIds = companyState.SelectMany(c => c.StaleEffectIds ?? []).ToArray(),
                 discoveryExhaustive = false,
                 newsTextCompleteness = request.TextCompleteness,
                 completeForSelectedScopes = request.TextCompleteness == "full" && checkpoint.PendingCompanyIds.Length == 0 && checkpoint.RecipientCursor is null &&
                     companyState.All(c => c.Status == "completed" && c.StaleEffectIds is not { Length: > 0 }) && scope.MissingPersonIds.Length == 0 &&
-                    analyzed.All(c => c.Status == "completed" && c.ContextComplete == true && c.Receipt?.UnrevisedEffectIds is not { Count: > 0 }) &&
+                    analyzed.All(c => c.Status == "completed" && c.ContextComplete == true && c.Receipt?.UnrevisedEffectIds is not { Count: > 0 } && c.Receipt?.UnpublishedDrafts is not { Length: > 0 }) &&
                     selected.All(id => analyzed.Any(c => c.CompanyId == id)) && groupViews.All(g => g.Complete) && roleViews.All(v => v["status"]?.GetValue<string>() == "completed")
             }
         };

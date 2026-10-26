@@ -155,8 +155,8 @@ public sealed class FinancialSemanticsPersistenceTests
         using var database = new PgTestDatabase();
         var fixture = PreservationFixture.Load();
         var repository = new EffectRepository(database.Context);
-        var draft = fixture.First.Drafts.Single();
-        var contract = draft.SourceRefs.Single(r => r.MaterialId != fixture.First.NewsMaterialId);
+        var draft = fixture.CurrentFirst.Drafts.Single();
+        var contract = draft.SourceRefs.Single(r => r.MaterialId != fixture.CurrentFirst.NewsMaterialId);
         var quote = $"Approved budget:2027 for {draft.Impact!.EconomicObjectId}: interest RUB 120000.";
         fixture.AddVersion(contract.MaterialId, "budget", text: quote);
         var reference = fixture.Reference(contract.MaterialId, "budget");
@@ -170,11 +170,11 @@ public sealed class FinancialSemanticsPersistenceTests
         };
         draft = draft with
         {
-            SourceRefs = [.. draft.SourceRefs.Where(r => r.MaterialId == fixture.First.NewsMaterialId), reference],
+            SourceRefs = [.. draft.SourceRefs.Where(r => r.MaterialId == fixture.CurrentFirst.NewsMaterialId), reference],
             Question = draft.Question! with { Frame = "budget_delta", BaselinePeriod = "budget:2027" },
             Assessment = new([condition], [], new("established", "documented_exposure", "Approved own budget", [reference], []))
         };
-        var request = fixture.First with { Drafts = [draft] };
+        var request = fixture.CurrentFirst with { Drafts = [draft] };
         var preparation = new AnalysisPreparationService(repository, null!, fixture, null!, null!);
         var prepared = await preparation.PrepareAsync(new() { Request = request, Drafts = request.Drafts });
         var saved = await new AnalysisService(repository, fixture).Save(request);
@@ -197,7 +197,7 @@ public sealed class FinancialSemanticsPersistenceTests
     public async Task ApplicabilityOnlyCandidateDoesNotRequireUnavailableFinancialDimensions(string status)
     {
         var fixture = PreservationFixture.Load();
-        var assessment = fixture.First.Drafts.Single().Assessment!;
+        var assessment = fixture.CurrentFirst.Drafts.Single().Assessment!;
         if (status == "conditional")
         {
             assessment = assessment with { Applicability = assessment.Applicability! with { Assumptions = ["Future rate scenario"] } };
@@ -205,8 +205,8 @@ public sealed class FinancialSemanticsPersistenceTests
         var service = new AnalysisPreparationService(null!, null!, fixture, null!, null!);
         var result = await service.ValidateApplicabilityAsync(new()
         {
-            CompanyId = fixture.First.CompanyId,
-            AsOf = fixture.First.AsOf,
+            CompanyId = fixture.CurrentFirst.CompanyId,
+            AsOf = fixture.CurrentFirst.AsOf,
             Candidates = [new() { Assessment = assessment, EvidenceStatus = status, HasCalculation = true }]
         }, CancellationToken.None);
         Assert.Null(result.Error);
@@ -221,14 +221,14 @@ public sealed class FinancialSemanticsPersistenceTests
         using var database = new PgTestDatabase();
         var fixture = PreservationFixture.Load();
         var repository = new EffectRepository(database.Context);
-        var draft = fixture.First.Drafts.Single();
+        var draft = fixture.CurrentFirst.Drafts.Single();
         draft = defect switch
         {
             "budget" => draft with { Question = draft.Question! with { Frame = "budget_delta", BaselinePeriod = "budget:2027" } },
             "missing_object" => draft with { Impact = draft.Impact! with { EconomicObjectId = null } },
             _ => draft with { Impact = draft.Impact! with { EconomicObjectId = "InventedLoan" } }
         };
-        var request = fixture.First with { Drafts = [draft] };
+        var request = fixture.CurrentFirst with { Drafts = [draft] };
         var preparation = new AnalysisPreparationService(repository, null!, fixture, null!, null!);
         var prepared = await ResultAssert.ErrorAsync(() => preparation.PrepareAsync(new() { Request = request, Drafts = request.Drafts }));
         Assert.Equal(422, (int)prepared.HttpStatusCode!);
@@ -246,12 +246,12 @@ public sealed class FinancialSemanticsPersistenceTests
         var fixture = PreservationFixture.Load();
         var repository = new EffectRepository(database.Context);
         var preparation = new AnalysisPreparationService(repository, null!, fixture, null!, null!);
-        var prepared = await preparation.PrepareAsync(new() { Request = fixture.First, Drafts = fixture.First.Drafts }).RequireContentAsync();
+        var prepared = await preparation.PrepareAsync(new() { Request = fixture.CurrentFirst, Drafts = fixture.CurrentFirst.Drafts }).RequireContentAsync();
         Assert.Single(prepared.Drafts);
         var service = new AnalysisService(repository, fixture);
-        var saved = await service.Save(fixture.First).RequireContentAsync();
+        var saved = await service.Save(fixture.CurrentFirst).RequireContentAsync();
         Assert.Equal("20000", Assert.Single(saved.Effects).CurrentRevision.CalculationResult);
-        Assert.True((await service.Save(fixture.First).RequireContentAsync()).Duplicate);
+        Assert.True((await service.Save(fixture.CurrentFirst).RequireContentAsync()).Duplicate);
     }
 
     [Fact]
@@ -270,7 +270,7 @@ public sealed class FinancialSemanticsPersistenceTests
             Question = question,
             Impact = draft.Impact! with { EconomicObjectId = null },
             ModelExplanation = draft.Conclusion,
-            Conclusion = AnalysisService.CalculatedConclusion("budget_delta", "20000", "RUB", "2027", draft.LiteralObjectRef),
+            Conclusion = QuestionIdentityPolicy.LegacyReceiptConclusion("budget_delta", "20000", "RUB", "2027", draft.LiteralObjectRef),
             Calculation = DecimalCalculator.Calculate(draft.Calculation!).RequireContent().Calculation,
             SourceRefs = draft.SourceRefs.OrderBy(r => r.MaterialId, StringComparer.Ordinal).ThenBy(r => r.VersionId, StringComparer.Ordinal).ThenBy(r => r.ContentHash, StringComparer.Ordinal).ToArray()
         };

@@ -105,14 +105,28 @@ public sealed class AnalysisService(IEffectRepository repository, ISourceResolve
 
             if (priorReceipt.RequestHash != hash)
             {
-                var legacyNormalization = AnalysisRequestNormalizer.Normalize(request, false);
-                if (legacyNormalization.Error is { } legacyError)
+                // Null optional claims serialize exactly like old requests. Only exact old
+                // hashes may replay a receipt; legacy formatting cannot admit a new write.
+                var compatible = false;
+                foreach (var normalizeQuestions in new[] { true, false })
                 {
-                    return new(legacyError);
+                    foreach (var legacyCalculatedConclusion in new[] { false, true })
+                    {
+                        if (legacyCalculatedConclusion && request.Drafts.Any(d => d.CalculationClaim is not null))
+                        {
+                            continue;
+                        }
+                        var legacyNormalization = AnalysisRequestNormalizer.Normalize(request, normalizeQuestions, legacyCalculatedConclusion);
+                        if (legacyNormalization.Error is not null)
+                        {
+                            continue;
+                        }
+                        var legacyHash = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(
+                            JsonSerializer.Serialize(legacyNormalization.Content.Item1, Json))));
+                        compatible |= priorReceipt.RequestHash == legacyHash;
+                    }
                 }
-                var legacyHash = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(
-                    JsonSerializer.Serialize(legacyNormalization.Content.Item1, Json))));
-                if (priorReceipt.RequestHash != legacyHash)
+                if (!compatible)
                 {
                     return new(new Error("This completed news analysis has a different payload.", ErrorSource.Client, ErrorType.CorruptedInfo) { HttpStatusCode = HttpStatusCode.Conflict });
                 }
@@ -267,6 +281,12 @@ public sealed class AnalysisService(IEffectRepository repository, ISourceResolve
             {
                 return new(applicabilityError);
             }
+            // Still validate source/hash/scope/applicability above. A diagnostic does
+            // not claim a head update and must not enter revision/reassessment writes.
+            if (AnalysisPublicationPolicy.IsDiagnostic(draft))
+            {
+                continue;
+            }
             if (current.TryGetValue(draft.EffectKey, out var existing))
             {
                 if (draft.ExpectedPreviousRevisionId != existing.CurrentRevision.RevisionId)
@@ -351,6 +371,14 @@ public sealed class AnalysisService(IEffectRepository repository, ISourceResolve
             }
         }
 
+        foreach (var item in prepared)
+        {
+            if (CalculationClaimPolicy.Validate(item.Draft, item.CalculationResult) is { } claimError)
+            {
+                return new(claimError);
+            }
+        }
+
         return await repository.Save(normalized, hash, prepared);
     }
 
@@ -360,5 +388,4 @@ public sealed class AnalysisService(IEffectRepository repository, ISourceResolve
     public static QuestionIdentity NormalizeQuestion(QuestionIdentity question) => QuestionIdentityPolicy.NormalizeQuestion(question);
     public static Result<string> QuestionKey(string literal, QuestionIdentity input) => QuestionIdentityPolicy.QuestionKey(literal, input);
     public static string ProcessingVersion(string version, MaterialTrigger? trigger) => QuestionIdentityPolicy.ProcessingVersion(version, trigger);
-    public static string CalculatedConclusion(string frame, string value, string unit, string period, string literal) => QuestionIdentityPolicy.CalculatedConclusion(frame, value, unit, period, literal);
 }

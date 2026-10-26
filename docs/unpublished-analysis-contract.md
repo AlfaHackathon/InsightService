@@ -1,0 +1,15 @@
+# Processed analysis without public insight
+
+The existing atomic empty-effects receipt is the no-publication path. A validated missing-data draft is retained in optional internal `unpublishedDrafts`, with `outcome: "no_insight"` when there are no new canonical revisions (`insights_saved` otherwise). Both fields are omitted for old receipts, which replay unchanged. This is a response/persistence JSON extension, not a SQL migration or a new job platform.
+
+Classification is typed: no calculation, and evidenceStatus=unknown; omitted impact on a canonical question is also unknown, as is status=unknown without impact on a legacy draft. A valid qualitative supported consequence can still publish without calculation. A grounded contradiction is a separate review revision. No NLP phrase classification, automatic proposal copying or conversion of failed validation into an unknown outcome.
+
+All existing admission, exact source/hash/company checks and applicability validation still execute. Diagnostic drafts alone skip head/conflict/reassessment checks because they do not write a head. Repository records the request hash and full diagnostics atomically with any actual new revisions. Good current heads/history and their state version remain untouched when only diagnostics are saved. The existing runCompany completion path accepts a receipt with effects=[]; no fake completed job status is written.
+
+Canonical projection does not turn old heads into newly actionable facts for no_insight. A mixed receipt may have supported effects plus diagnostics: group and job coverage include separate unassessedCompanyIds; known subtotal remains available, full total and complete coverage remain false. Retrieval contextComplete retains its original meaning. No-insight is processing completion, not evidence completeness.
+
+Public feed skips missing-data/unknown heads and preserves the underlying cursor; detail returns 404. Historical scoped history remains available with the same source and membership checks; no rows are rewritten. Neither public DTO nor frontend receives unpublishedDrafts/model audit. An internal receipt is not a public card.
+
+Rollout: deploy the additive Agent receipt consumer and conditional repair, then this Insight boundary, with generation paused until both are healthy. This correctness change can run without the separate narrative claim contract. Do not execute conditional repair against the old Insight writer, which could still persist missing-data drafts. No Gateway/ingress/frontend/CSV/parser changes. Exact old receipts are not upgraded/backfilled.
+
+Cloud coverage uses linked source and fake dependencies only (no organization package/native DB proof). Native release gate must run the full solution build/tests against the already approved executor and existing test DB configuration, including UnpublishedAnalysisPersistenceTests, ReassessmentScopePersistenceTests and QuestionHistoryTests. No new deployed test stack. No production writes/model calls were performed in cloud.
