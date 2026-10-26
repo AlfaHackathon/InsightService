@@ -2,6 +2,8 @@
 
 Этот согласованный integration candidate объединяет owner API `9edf45fb` и shared category contract `7720106` в отдельной ветке `codex/insight-owner-category-integration-20261025`. Наличие кода/локальных HTTP-тестов не означает публикацию маршрутов на production. Gateway/nginx ingress проверяется отдельно после релиза. Новых портов, CORS, ACL и генерации эта ветка не добавляет.
 
+Финальный combined candidate в `codex/owner-category-period-integration-20261026` дополнительно сохраняет prepare/save parity fix `80b9be2f`: подготовленный batch проходит тот же normalizer, а preview остаётся без записи и без переписывания расчёта. Public read paths и DTO этим merge не меняются. Тесты проверяют совместное сохранение category, companyImportance и exact evidence; неверная category отклоняется при prepare/save. Native package gate остаётся отдельным.
+
 ## Вызовы
 
 Внешний клиент использует Bearer через существующий AuthGateway. Insight получает проверенный `X-User-Id` внутри доверенной сети и сам запрашивает текущий membership CompanyService. Клиент не присылает `companyId`, `personId`, `asOf` или внутренний секрет. Direct Insight ingress не предназначен для публичного доступа.
