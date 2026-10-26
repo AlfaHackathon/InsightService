@@ -32,10 +32,15 @@ internal static partial class PublicInsightProjection
     internal static PublicInsightSource Metadata(MaterialVersion source)
     {
         var p = source.Provenance;
+        var url = SafeUrl(p?.SourceUrl);
+        // Material provenance has no parser document ID. Never substitute a material ID or private locator.
         return new(source.MaterialId, source.VersionId, source.ContentHash, source.SourceId, source.Kind, source.Title, source.KnownAt, source.PublishedAt,
-            p is null ? null : new(p.Acquisition, SafeUrl(p.SourceUrl), p.RetrievedAt, p.TextCompleteness, p.OriginVersionId));
+            p is null ? null : new(p.Acquisition, url, p.RetrievedAt, p.TextCompleteness, p.OriginVersionId), Url: url);
     }
-    private static string? SafeUrl(string? value) => Uri.TryCreate(value, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https" && string.IsNullOrEmpty(uri.UserInfo) ? value : null;
+    private static string? SafeUrl(string? value) => value is { Length: > 0 and <= 4096 } &&
+        !value.Any(character => char.IsControl(character) || char.IsWhiteSpace(character) || character == '\\') &&
+        Uri.TryCreate(value, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https" &&
+        uri.Host.Length > 0 && string.IsNullOrEmpty(uri.UserInfo) ? value : null;
     internal static (PublicInsightIndicator[] Items, PublicIndicatorAvailability Availability) Unavailable(string reason) => ([], new(reason, reason switch
     {
         "no_calculation" => "В этой ревизии нет обоснованного расчёта.",
