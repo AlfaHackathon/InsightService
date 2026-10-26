@@ -13,7 +13,7 @@ public sealed class ApplicabilityTests : IDisposable
     private static readonly DateTimeOffset At = DateTimeOffset.Parse("2026-10-23T08:00:00Z");
     private const string Hash = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     private AnalysisService Service() => new(new EffectRepository(database.Context), new Sources(company));
-    private AnalysisRequest Request() => new(company, "U_1", "news", "1", At, [new("q", "company:" + company, null, "The company impact remains conditional", "conditional", [new("news", "1", Hash), new("profile", "1", Hash)], Impact: new("risk", "qualitative", null, "conditional", 1, 1, 1), Question: new("financing_cost", "event_only", "qualitative", "unknown", null, "qualitative"), Assessment: new([], [new("Actual exposure is unknown", null, "company", "profile")]))]);
+    private AnalysisRequest Request() => new(company, "U_1", "news", "1", At, [new("q", "company:" + company, null, "The company impact remains conditional", "conditional", [new("news", "1", Hash), new("profile", "1", Hash)], Impact: new("risk", "qualitative", null, "conditional", 1, 1, 1), Question: new("financing_cost", "event_only", "qualitative", "unknown", null, "qualitative"), Assessment: new([], [new("Actual exposure is unknown", null, "company", "profile")]), Title: "Сценарий влияния изменения индекса")]);
     [Fact]
     public async Task ConditionalWithoutEstablishedCompanyExposureCannotBeSaved()
     {
@@ -64,7 +64,7 @@ public sealed class ApplicabilityTests : IDisposable
     }
 
     [Fact]
-    public async Task UnknownIsPersistedAsMissingDataAndNotAsZero()
+    public async Task UnknownIsPersistedAsDiagnosticReceiptWithoutHeadOrInventedZero()
     {
         var request = Request();
         var draft = request.Drafts[0];
@@ -81,9 +81,19 @@ public sealed class ApplicabilityTests : IDisposable
 
             ]
         };
-        var saved = Assert.Single((await (Service().Save(request)).RequireContentAsync()).Effects);
-        Assert.Equal("missing_data", saved.CurrentRevision.PublicationClass);
-        Assert.Null(saved.CurrentRevision.CalculationResult);
+        var receipt = (await Service().Save(request)).RequireContent();
+        Assert.Equal("no_insight", receipt.Outcome);
+        Assert.Empty(receipt.Effects);
+        var diagnostic = Assert.Single(receipt.UnpublishedDrafts!);
+        Assert.Equal("unknown", diagnostic.Status);
+        Assert.Equal("unknown", diagnostic.Impact!.EvidenceStatus);
+        Assert.Equal(draft.Assessment!.Unknowns, diagnostic.Assessment!.Unknowns);
+        Assert.Null(diagnostic.Calculation);
+        Assert.Empty((await Service().GetSnapshot(company, "news")).RequireContent().Effects);
+        var replay = (await Service().Save(request)).RequireContent();
+        Assert.True(replay.Duplicate);
+        Assert.Equal(receipt.AnalysisId, replay.AnalysisId);
+        Assert.Empty(replay.Effects);
     }
 
     [Fact]

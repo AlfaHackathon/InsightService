@@ -21,7 +21,7 @@ The native Agent tool asks for optional `calculationClaimQuote` only. Agent deri
 
 Fields are additive and ignored on null serialization. Existing receipt comparisons try exact historical normalization hashes only for existing receipts; the old template is retained solely inside `LegacyReceiptConclusion` for hash reconstruction, never new admission or reads. Exact historical retries return the original duplicate receipt before source acquisition or new claim validation. Changed payload remains a conflict. Legacy records/history need no backfill.
 
-Deploy the compatible Agent producer first, then Insight validation in one coordinated quiet worker window. Old Insight ignores the additive field and retains old behavior until upgraded; new Insight rejects unsupported newly calculated prose from old producers. Quiesce in-flight old producers during cutover. Roll back the pair if necessary; do not rewrite history. No SQL migration or ingress/auth change is needed.
+Pause and drain all analysis writers, including chat-triggered work and leased jobs. Deploy Insight first, then the compatible Agent producer, verify both, and only then resume analyses. New Insight rejects unsupported calculated prose or missing titles from old producers, so this is a coordinated paused cutover, not a promise of rolling write compatibility. Legacy receipt/read compatibility remains. Roll back the pair if necessary; do not rewrite history. No SQL migration or ingress/auth change is needed.
 
 Insufficient-evidence publication is a separate coordinated receipt boundary: producer acceptance of a coherent unknown is internal analysis, not permission to publish a card. Pair conditional repair with that boundary before running live generation.
 

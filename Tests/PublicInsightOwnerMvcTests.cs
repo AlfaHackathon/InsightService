@@ -241,5 +241,11 @@ public sealed class PublicInsightOwnerMvcTests
         Assert.Equal(4, claim.GetProperty("required").GetArrayLength());
         Assert.True(schemas.GetProperty("EffectRevision").GetProperty("properties").TryGetProperty("calculationClaim", out _));
         Assert.False(schemas.GetProperty("PublicInsightRevision").GetProperty("properties").TryGetProperty("calculationClaim", out _));
+        foreach (var type in new[] { "EffectRevision", "PublicInsightRevision" })
+        {
+            var title = schemas.GetProperty(type).GetProperty("properties").GetProperty("title");
+            Assert.True(title.GetProperty("nullable").GetBoolean());
+            Assert.Equal(180, title.GetProperty("maxLength").GetInt32());
+        }
     }
 }

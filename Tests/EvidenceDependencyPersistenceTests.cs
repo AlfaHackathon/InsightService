@@ -32,12 +32,15 @@ public sealed class EvidenceDependencyPersistenceTests : IDisposable
     }
 
     [Fact]
-    public async Task GraphSurvivesReceiptHistoryAndReplayWhileChangedGraphConflicts()
+    public async Task GraphSurvivesDiagnosticReceiptsAndReplayWhileChangedGraphConflictsWithoutCreatingHeads()
     {
         var firstRequest = Request();
         var first = (await Service().Save(firstRequest)).RequireContent();
-        var firstRevision = Assert.Single(first.Effects);
-        var secondRequest = Request("2", firstRevision.RevisionId);
+        Assert.Equal("no_insight", first.Outcome);
+        Assert.Empty(first.Effects);
+        var firstDraft = Assert.Single(first.UnpublishedDrafts!);
+        Assert.Equal("observed", firstDraft.Assessment!.Conditions[0].Assertion);
+        var secondRequest = Request("2");
         var draft = secondRequest.Drafts[0];
         secondRequest = secondRequest with { Drafts = [draft with
         {
@@ -48,17 +51,21 @@ public sealed class EvidenceDependencyPersistenceTests : IDisposable
             }
         }] };
         var second = (await Service().Save(secondRequest)).RequireContent();
-        var current = (await Service().GetEffect(firstRevision.EffectId)).RequireContent();
-        Assert.Equal(2, current.History.Count);
-        Assert.Equal("observed", current.History[0].Assessment!.Conditions[0].Assertion);
-        Assert.Equal(["index_identity"], Assert.IsType<string[]>(current.History[1].Assessment!.Conditions[1].DependsOn));
-        Assert.Equal("index_identity", current.History[1].Assessment!.Unknowns[0].Id);
+        Assert.Equal("no_insight", second.Outcome);
+        Assert.Empty(second.Effects);
+        var persisted = (await Service().GetAnalysis(company, "news", "2")).RequireContent();
+        var diagnostic = Assert.Single(persisted.UnpublishedDrafts!);
+        Assert.Equal(["index_identity"], Assert.IsType<string[]>(diagnostic.Assessment!.Conditions[1].DependsOn));
+        Assert.Equal("index_identity", diagnostic.Assessment.Unknowns[0].Id);
+        Assert.Equal(secondRequest.Drafts[0].SourceRefs, diagnostic.SourceRefs);
+        Assert.Null(diagnostic.Calculation);
+        Assert.Empty((await Service().GetEffects(company, "news")).RequireContent());
 
         var replay = (await Service().Save(firstRequest)).RequireContent();
         Assert.True(replay.Duplicate);
         Assert.Equal(first.AnalysisId, replay.AnalysisId);
-        Assert.Single(Assert.Single(replay.Effects).CurrentRevision.Assessment!.Conditions);
-        Assert.Equal(Assert.Single(second.Effects).RevisionId, (await Service().GetEffect(firstRevision.EffectId)).RequireContent().CurrentRevision.RevisionId);
+        Assert.Empty(replay.Effects);
+        Assert.Single(Assert.Single(replay.UnpublishedDrafts!).Assessment!.Conditions);
         Assert.True((await Service().Save(secondRequest)).RequireContent().Duplicate);
 
         var changed = secondRequest with { Drafts = [secondRequest.Drafts[0] with
@@ -69,11 +76,13 @@ public sealed class EvidenceDependencyPersistenceTests : IDisposable
             }
         }] };
         Assert.Equal(HttpStatusCode.Conflict, (await ResultAssert.ErrorAsync(async () => await Service().Save(changed))).HttpStatusCode);
-        Assert.Equal(2, (await Service().GetEffect(firstRevision.EffectId)).RequireContent().History.Count);
+        var unchanged = Assert.Single((await Service().GetAnalysis(company, "news", "2")).RequireContent().UnpublishedDrafts!);
+        Assert.Equal(["index_identity"], Assert.IsType<string[]>(unchanged.Assessment!.Conditions[1].DependsOn));
+        Assert.Empty((await Service().GetEffects(company, "news")).RequireContent());
     }
 
     [Fact]
-    public async Task LegacyReceiptReplaysWithoutSynthesizedMetadataAndAddingGraphConflicts()
+    public async Task LegacyDiagnosticReceiptReplaysWithoutSynthesizedMetadataAndAddingGraphConflicts()
     {
         var graph = Request();
         var draft = graph.Drafts[0];
@@ -84,15 +93,21 @@ public sealed class EvidenceDependencyPersistenceTests : IDisposable
         }}] };
         var first = (await Service().Save(legacy)).RequireContent();
         var replay = (await Service().Save(legacy)).RequireContent();
+        Assert.Equal("no_insight", first.Outcome);
+        Assert.Empty(first.Effects);
         Assert.True(replay.Duplicate);
         Assert.Equal(first.AnalysisId, replay.AnalysisId);
-        Assert.Null(Assert.Single(replay.Effects).CurrentRevision.Assessment!.Conditions[0].Id);
+        var diagnostic = Assert.Single(replay.UnpublishedDrafts!);
+        Assert.Null(diagnostic.Assessment!.Conditions[0].Id);
+        Assert.Null(diagnostic.Assessment.Conditions[0].Assertion);
+        Assert.Null(diagnostic.Assessment.Conditions[0].DependsOn);
+        Assert.Null(diagnostic.Assessment.Unknowns[0].Id);
         Assert.Equal(HttpStatusCode.Conflict, (await ResultAssert.ErrorAsync(async () => await Service().Save(graph))).HttpStatusCode);
-        Assert.Single((await Service().GetEffect(Assert.Single(first.Effects).EffectId)).RequireContent().History);
+        Assert.Empty((await Service().GetEffects(company, "news")).RequireContent());
     }
 
-    private AnalysisRequest Request(string version = "1", string? previous = null) => new(company, "U_1", "news", version, At,
-        [new("q", "company:" + company, previous, "Synthetic financing assessment", "unknown",
+    private AnalysisRequest Request(string version = "1") => new(company, "U_1", "news", version, At,
+        [new("q", "company:" + company, null, "Synthetic financing assessment", "unknown",
             [new("news", version, Hash), new("contract", "1", Hash)],
             Impact: new("risk", "qualitative", null, "unknown", 1, 1, 1),
             Question: new("financing_cost", "event_only", "qualitative", "unknown", null, "qualitative"),

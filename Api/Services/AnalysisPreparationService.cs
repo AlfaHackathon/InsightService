@@ -271,6 +271,10 @@ public sealed class AnalysisPreparationService(
         }
         foreach (var item in normalization.Content.Item2)
         {
+            if (InsightTitlePolicy.Validate(item.Draft) is { } titleError)
+            {
+                return new(titleError);
+            }
             if (CalculationClaimPolicy.Validate(item.Draft, item.CalculationResult) is { } claimError)
             {
                 return new(claimError);

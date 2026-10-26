@@ -21,7 +21,7 @@ public sealed class AnalysisTests : IDisposable
     private AnalysisService Service() => new(Repository(), new Sources(company, now));
     private static ExpressionNode Value(string text) => new("value", text);
     private static Calculation Cost(string delta) => new(new("multiply", Left: Value(delta), Right: Value("104")), "RUB", "Synthetic planned acceptance");
-    private AnalysisRequest Request(string version = "v1", string? prior = null, string delta = "150") => new(company, "U_97", "news", version, now.AddHours(1), [new("lot-1", "contract-1/lot-1", prior, "Synthetic expected additional cost", "planned", [new("news", version, Hash), new("contract", "v1", Hash)], Cost(delta))]);
+    private AnalysisRequest Request(string version = "v1", string? prior = null, string delta = "150") => new(company, "U_97", "news", version, now.AddHours(1), [new("lot-1", "contract-1/lot-1", prior, "Synthetic expected additional cost", "planned", [new("news", version, Hash), new("contract", "v1", Hash)], Cost(delta), Title: "Изменение ожидаемых расходов")]);
     [Fact]
     public async Task CategoryIsSavedPerRevisionAndNeverBackfilledFromTheCurrentHead()
     {

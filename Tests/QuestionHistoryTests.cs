@@ -15,7 +15,7 @@ public sealed class QuestionHistoryTests : IDisposable
     private readonly DateTimeOffset at = DateTimeOffset.Parse("2026-10-22T12:00:00Z");
     private const string Hash = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     private AnalysisService Service() => new(new EffectRepository(database.Context), new Sources(at, company));
-    private AnalysisRequest Request(string news, string version, string? prior = null, string mechanism = "financing_cost") => new(company, null, news, version, at.AddHours(1), [new("question-" + mechanism, "company:" + company, prior, "Synthetic source correction requires review.", "observed", [new(news, version, Hash)], Impact: new("qualitative", "qualitative", null, "contradicted", 0, 0, 0), Question: new(mechanism, "absolute", "RUB", "2026", null))]);
+    private AnalysisRequest Request(string news, string version, string? prior = null, string mechanism = "financing_cost") => new(company, null, news, version, at.AddHours(1), [new("question-" + mechanism, "company:" + company, prior, "Synthetic source correction requires review.", "observed", [new(news, version, Hash)], Impact: new("qualitative", "qualitative", null, "contradicted", 0, 0, 0), Question: new(mechanism, "absolute", "RUB", "2026", null), Title: "Пересмотр последствий изменения условий")]);
     [Fact]
     public async Task RestrictedNewVersionCannotInvalidateAnotherCompanyThroughOldDependency()
     {

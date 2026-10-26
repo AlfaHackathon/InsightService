@@ -373,6 +373,10 @@ public sealed class AnalysisService(IEffectRepository repository, ISourceResolve
 
         foreach (var item in prepared)
         {
+            if (InsightTitlePolicy.Validate(item.Draft) is { } titleError)
+            {
+                return new(titleError);
+            }
             if (CalculationClaimPolicy.Validate(item.Draft, item.CalculationResult) is { } claimError)
             {
                 return new(claimError);

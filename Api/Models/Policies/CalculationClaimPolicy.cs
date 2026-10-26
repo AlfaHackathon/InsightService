@@ -12,8 +12,6 @@ internal static partial class CalculationClaimPolicy
     // Arbitrary prose, worded amounts, scales and financial truth are not inferred.
     [GeneratedRegex(@"^(?<value>[+-]?(?:[0-9]+|[0-9]{1,3}(?:[ \u00a0\u202f][0-9]{3})+)(?:\.[0-9]+)?)[ \u00a0\u202f]*(?<unit>[A-Z]{3}|₽|руб\.)$", RegexOptions.CultureInvariant)]
     private static partial Regex Literal();
-    [GeneratedRegex(@"[+-]?[0-9]+(?:[ \u00a0\u202f][0-9]{3})*(?:\.[0-9]+)?", RegexOptions.CultureInvariant)]
-    private static partial Regex Number();
     [GeneratedRegex(@"₽|(?<![\p{L}])[A-Z]{3}(?![\p{L}])|(?<![\p{L}])руб(?:\.|лей|ля|ль)?(?![\p{L}])", RegexOptions.CultureInvariant)]
     private static partial Regex UnitMarker();
 
@@ -21,6 +19,52 @@ internal static partial class CalculationClaimPolicy
     private static partial Regex ScaleMarker();
 
     public static Error? Validate(EffectDraft draft, string? result)
+    {
+        var claim = draft.CalculationClaim;
+        if (claim is null)
+        {
+            var conclusionError = ValidateField(draft, result);
+            return conclusionError ?? (draft.Title is null ? null : ValidateField(draft with { Conclusion = draft.Title }, result));
+        }
+        if (draft.Calculation is null)
+        {
+            return Fail("CONCLUSION_CLAIM_WITHOUT_CALCULATION", "A result claim requires this draft's calculation.");
+        }
+        if (string.IsNullOrEmpty(claim.Quote))
+        {
+            return Fail("CONCLUSION_CLAIM_INVALID_QUOTE", "Use one bounded decimal-result quote.");
+        }
+        var inConclusion = draft.Conclusion.Contains(claim.Quote, StringComparison.Ordinal);
+        var inTitle = draft.Title?.Contains(claim.Quote, StringComparison.Ordinal) == true;
+        if (!inConclusion && !inTitle)
+        {
+            return Fail("CONCLUSION_CLAIM_INVALID_QUOTE", "Quote must occur exactly in title or conclusion.");
+        }
+        var error = ValidateField(draft with { CalculationClaim = inConclusion ? claim : null }, result);
+        return error ?? (draft.Title is null ? null : ValidateField(draft with
+        {
+            Conclusion = draft.Title,
+            CalculationClaim = inTitle ? claim : null
+        }, result));
+    }
+
+    internal static bool ContainsNumericClaim(string text) => HasNumericRune(text) || UnitMarker().IsMatch(text) || ScaleMarker().IsMatch(text);
+
+    private static bool HasNumericRune(string text)
+    {
+        // Supported result quotes stay ASCII invariant decimals. Other Unicode
+        // numeral forms must be rejected, not silently treated as qualitative.
+        foreach (var rune in text.EnumerateRunes())
+        {
+            if (Rune.IsNumber(rune))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static Error? ValidateField(EffectDraft draft, string? result)
     {
         var claim = draft.CalculationClaim;
         if (draft.Calculation is not { } calculation)
@@ -70,7 +114,7 @@ internal static partial class CalculationClaimPolicy
         // Declared period is allowed as text; other numerical facts belong in the
         // structured calculation/assessment, not an unbound result assertion.
         remaining = Regex.Replace(remaining, @"(?<![\p{L}\p{N}])" + Regex.Escape(calculation.Period) + @"(?![\p{L}\p{N}])", " ", RegexOptions.CultureInvariant);
-        if (Number().IsMatch(remaining))
+        if (HasNumericRune(remaining))
         {
             return Fail(claim is null ? "CONCLUSION_CLAIM_REQUIRED" : "CONCLUSION_UNBOUND_NUMBER", "Only the bound result and declared period may be numeric in calculated conclusion.");
         }

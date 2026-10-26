@@ -18,9 +18,12 @@ public sealed class CompanyImportanceTests : IDisposable
     private static readonly SourceRef News = new("news", "v1", Hash);
     private static SourceRef Own(Guid company) => new("own-" + company.ToString("N"), "v1", Hash);
     private static AnalysisRequest Request(Guid company, int? score) => new(company, null, "news", "v1", Time,
-        [new("importance", "company:" + company.ToString("D"), null, "Synthetic decision question", "unknown", [News, Own(company)],
+        [new("importance", "company:" + company.ToString("D"), null, "Synthetic own-company dependency requires review.", "observed", [News, Own(company)],
+            Impact: new("qualitative", "qualitative", null, "supported", score ?? 0, 0, 0),
             Question: new QuestionIdentity("liquidity", "event_only", "qualitative", "2026-11", null, "qualitative"),
-            CompanyImportance: new(score, score is null ? "Company materiality cannot be established." : "An explicit own-company dependency needs prompt review.", score is null ? [] : [Own(company)]))]);
+            Assessment: new([], [], new("established", "documented_exposure", "The own document establishes an explicit company dependency.", [Own(company)], [])),
+            CompanyImportance: new(score, score is null ? "Company materiality cannot be established." : "An explicit own-company dependency needs prompt review.", score is null ? [] : [Own(company)]),
+            Title: "Важность изменения условий для компании")]);
     private AnalysisService Service() => new(new EffectRepository(database.Context), new Sources());
 
     [Fact]
@@ -30,6 +33,8 @@ public sealed class CompanyImportanceTests : IDisposable
         var b = Guid.NewGuid();
         var first = (await Service().Save(Request(a, 5))).RequireContent();
         var second = (await Service().Save(Request(b, 2))).RequireContent();
+        Assert.Equal("insights_saved", first.Outcome);
+        Assert.Empty(first.UnpublishedDrafts!);
         Assert.Equal(5, first.Effects.Single().CurrentRevision.CompanyImportance!.Score);
         Assert.Equal(2, second.Effects.Single().CurrentRevision.CompanyImportance!.Score);
         var reader = new EffectRepository(database.Context);

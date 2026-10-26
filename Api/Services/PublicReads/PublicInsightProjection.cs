@@ -27,7 +27,7 @@ internal static partial class PublicInsightProjection
                 a.Unknowns.Select(u => new PublicInsightMissingFact(u.Fact, u.Query, u.Scope, u.MaterialId, u.Id)).ToArray(),
                 app is null ? null : new(app.Status, app.Basis, app.Explanation, References(app.SourceRefs), app.Assumptions)),
             r.Trigger is { } trigger ? new(trigger.MaterialId, trigger.VersionId) : null, r.PublicationClass,
-            Category: r.Category);
+            Category: r.Category, Title: r.Title);
     }
     internal static PublicInsightSource Metadata(MaterialVersion source)
     {
@@ -49,7 +49,7 @@ internal static partial class PublicInsightProjection
     }));
 
     internal static EffectDraft Draft(EffectRevision r) => new("public-read", "public-read", null, r.Conclusion, r.Status, r.SourceRefs,
-        r.Calculation, r.Impact, r.Question, r.Assessment, CompanyImportance: r.CompanyImportance, Category: r.Category);
+        r.Calculation, r.Impact, r.Question, r.Assessment, CompanyImportance: r.CompanyImportance, Category: r.Category, Title: r.Title);
 
     internal static async Task<(PublicInsightIndicator[] Items, PublicIndicatorAvailability Availability)> Indicators(EffectRevision r,
         bool stale, IReadOnlyList<MaterialVersion> sources, Guid company)

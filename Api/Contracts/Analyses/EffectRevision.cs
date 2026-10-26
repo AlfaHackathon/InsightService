@@ -13,4 +13,5 @@ public sealed record EffectRevision(string RevisionId, string? PreviousRevisionI
     string? PublicationClass = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] CompanyImportance? CompanyImportance = null,
     string? Category = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] CalculationClaim? CalculationClaim = null);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] CalculationClaim? CalculationClaim = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Title = null);

@@ -401,6 +401,7 @@ internal sealed class PreservationFixture : ISourceResolver
     // New-write adapter only. The captured requests/receipts remain untouched for replay tests.
     public AnalysisRequest CurrentFirst => First with { Drafts = First.Drafts.Select(d => d with
     {
+        Title = "Изменение расходов по условиям займа",
         Conclusion = "Расходы могут увеличиться на 20000 RUB в 2027 году. Проверьте условия договора; фактическая оплата не подтверждена.",
         CalculationClaim = new("20000 RUB", "20000", "RUB", "2027")
     }).ToArray() };

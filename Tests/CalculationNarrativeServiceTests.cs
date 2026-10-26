@@ -88,7 +88,8 @@ public sealed class CalculationNarrativeServiceTests
     {
         var fixture = PreservationFixture.Load();
         var repo = new MemoryRepository();
-        var error = await ResultAssert.ErrorAsync(() => new AnalysisService(repo, fixture).Save(fixture.First));
+        var request = fixture.First with { Drafts = [fixture.First.Drafts[0] with { Title = "Обоснование изменения расходов" }] };
+        var error = await ResultAssert.ErrorAsync(() => new AnalysisService(repo, fixture).Save(request));
         Assert.StartsWith("CONCLUSION_CLAIM_REQUIRED:", error.Title);
         Assert.Null(repo.Saved);
     }
