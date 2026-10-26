@@ -245,7 +245,7 @@ public sealed class PublicInsightReadService(IPublicInsightMembershipResolver me
 
         var indicators = await PublicInsightProjection.Indicators(revision, item.RequiresReassessment, originals, scope.CompanyId);
         return new(item.Id, scope.CompanyId, item.NewsMaterialId, item.LiteralObjectRef, PublicInsightProjection.Revision(revision), item.RequiresReassessment,
-            originals.Select(PublicInsightProjection.Metadata).ToArray(), indicators.Items, indicators.Availability);
+            originals.DistinctBy(source => (source.MaterialId, source.VersionId)).Select(PublicInsightProjection.Metadata).ToArray(), indicators.Items, indicators.Availability);
     }
     private static PublicGeneralInsightCard General(GeneralInsightRead item, PublicGeneralInsight insight, PublicInsightMembership scope, Request request)
     {
@@ -259,7 +259,7 @@ public sealed class PublicInsightReadService(IPublicInsightMembershipResolver me
 
         var indicators = PublicInsightProjection.Unavailable("general_not_company_calculation");
         return new(item.Id, scope.CompanyId, item.NewsMaterialId, item.NewsVersionId, asOf, updatedAt, item.TextCompleteness,
-            item.CompanyStatus, insight, originals.Select(PublicInsightProjection.Metadata).ToArray(), indicators.Items, indicators.Availability);
+            item.CompanyStatus, insight, originals.DistinctBy(source => (source.MaterialId, source.VersionId)).Select(PublicInsightProjection.Metadata).ToArray(), indicators.Items, indicators.Availability);
     }
     private static SourceRef InternalRef(PublicInsightSourceRef reference) => new(reference.MaterialId, reference.VersionId, reference.ContentHash);
     private static void Id(string id)

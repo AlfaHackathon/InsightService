@@ -222,6 +222,10 @@ public sealed class PublicInsightOwnerMvcTests
         Assert.Equal(["risk", "opportunity", "event"], filter.GetProperty("schema").GetProperty("enum").EnumerateArray().Select(value => value.GetString()!).ToArray());
         var schemas = spec.GetProperty("components").GetProperty("schemas");
         Assert.Equal(2, schemas.GetProperty("PublicInsightCard").GetProperty("oneOf").GetArrayLength());
+        var source = schemas.GetProperty("PublicInsightSource").GetProperty("properties");
+        Assert.True(source.GetProperty("url").GetProperty("nullable").GetBoolean());
+        Assert.Equal("uri", source.GetProperty("url").GetProperty("format").GetString());
+        Assert.True(source.GetProperty("newsId").GetProperty("nullable").GetBoolean());
         foreach (var pair in new[] { ("PublicPersonalInsightCard", "personal"), ("PublicGeneralInsightCard", "general") })
         {
             var schema = schemas.GetProperty(pair.Item1);

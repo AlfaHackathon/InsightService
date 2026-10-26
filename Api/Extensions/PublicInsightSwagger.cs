@@ -82,5 +82,20 @@ public sealed class PublicInsightSchemaFilter : ISchemaFilter
         {
             value.Description = "Verbatim persisted Decimal result as a string. Missing is not zero; no browser-side recomputation.";
         }
+        if (context.Type == typeof(PublicInsightSource))
+        {
+            if (schema.Properties.TryGetValue("url", out var url))
+            {
+                url.Nullable = true;
+                url.Format = "uri";
+                url.MaxLength = 4096;
+                url.Description = "Exact authorized material provenance HTTP(S) URL, or null. No link is derived from IDs or text. Same value as provenance.sourceUrl.";
+            }
+            if (schema.Properties.TryGetValue("newsId", out var newsId))
+            {
+                newsId.Nullable = true;
+                newsId.Description = "Nullable parser document identity. Current material provenance does not carry this identity, so null is returned; materialId and private locator are never substituted.";
+            }
+        }
     }
 }
