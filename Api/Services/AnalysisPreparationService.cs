@@ -266,7 +266,7 @@ public sealed class AnalysisPreparationService(
         var normalization = AnalysisRequestNormalizer.Normalize(request with { Drafts = preparedDrafts });
         if (normalization.Error is { } validationError)
         {
-            return new(new Error(validationError.Title, ErrorSource.Client, ErrorType.CorruptedInfo)
+            return new(new Error(validationError.Title ?? "Analysis request validation failed.", ErrorSource.Client, ErrorType.CorruptedInfo)
             { HttpStatusCode = HttpStatusCode.UnprocessableEntity });
         }
         return new(new DraftPreparationResponse { Drafts = preparedDrafts }, null);
