@@ -57,14 +57,16 @@ public sealed class InsightUpdatesController(InsightUpdateSnapshot snapshots, In
         }
         var credential = protocols.SingleOrDefault(protocol => protocol.StartsWith(InsightConnectionTickets.TicketPrefix, StringComparison.Ordinal));
         var ticket = credential is null ? null : tickets.Consume(credential[InsightConnectionTickets.TicketPrefix.Length..]);
-        if (ticket is null) { return Unauthorized(new { code = "WS_TICKET_INVALID" }); }
+        if (ticket is null)
+        { return Unauthorized(new { code = "WS_TICKET_INVALID" }); }
         using var budget = CancellationTokenSource.CreateLinkedTokenSource(ct);
         budget.CancelAfter(limits.ReadTimeout);
         var user = ticket.UserId;
         var scope = ticket.Membership;
         var baseline = await snapshots.Read(user, scope, budget.Token);
         var expires = ticket.ConnectionExpiresAt;
-        if (expires <= DateTimeOffset.UtcNow) { return Unauthorized(); }
+        if (expires <= DateTimeOffset.UtcNow)
+        { return Unauthorized(); }
         using var socket = await HttpContext.WebSockets.AcceptWebSocketAsync(InsightConnectionTickets.Protocol);
         await sockets.Run(socket, user, scope, expires, baseline, ct);
         return new EmptyResult();

@@ -79,9 +79,9 @@ internal static partial class InsightPlainTextPolicy
         }
     }
 
-    private static IEnumerable<JsonElement> PlanEntries(JsonElement plan) =>
+    private static JsonElement.ArrayEnumerator PlanEntries(JsonElement plan) =>
         plan.ValueKind == JsonValueKind.Object && plan.TryGetProperty("generalInsights", out var insights) && insights.ValueKind == JsonValueKind.Array
-            ? insights.EnumerateArray() : [];
+            ? insights.EnumerateArray() : default;
 
     private static Error Invalid(string field) => new($"INSIGHT_PLAIN_TEXT_REQUIRED: Use plain text in {field}; preserve paragraphs and exact numbers, and put source URLs in source metadata.", ErrorSource.Client, ErrorType.CorruptedInfo)
     { HttpStatusCode = HttpStatusCode.UnprocessableEntity };

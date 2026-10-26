@@ -29,7 +29,9 @@ public sealed class InsightUpdateSocket(InsightUpdateSnapshot snapshots, Insight
         lifetime.CancelAfter(remaining > TimeSpan.Zero ? remaining : TimeSpan.Zero);
         var queue = Channel.CreateBounded<object>(new BoundedChannelOptions(limits.QueueCapacity)
         {
-            SingleReader = true, SingleWriter = true, FullMode = BoundedChannelFullMode.Wait
+            SingleReader = true,
+            SingleWriter = true,
+            FullMode = BoundedChannelFullMode.Wait
         });
         var status = WebSocketCloseStatus.NormalClosure;
         var reason = "reconnect_and_refetch";
@@ -61,7 +63,8 @@ public sealed class InsightUpdateSocket(InsightUpdateSnapshot snapshots, Insight
                         continue;
                     }
                     var update = await snapshots.Authorize(user, scope, head, budget.Token);
-                    if (update is null) { continue; }
+                    if (update is null)
+                    { continue; }
                     if (!queue.Writer.TryWrite(update))
                     {
                         Stop((WebSocketCloseStatus)1013, "slow_client_refetch");
@@ -104,9 +107,11 @@ public sealed class InsightUpdateSocket(InsightUpdateSnapshot snapshots, Insight
                 }
                 else
                 {
-                    if (!await pending) { return; }
+                    if (!await pending)
+                    { return; }
                     // One event per turn so heartbeat cannot starve under a continuous backlog.
-                    if (queue.Reader.TryRead(out var value)) { await Send(value); }
+                    if (queue.Reader.TryRead(out var value))
+                    { await Send(value); }
                     pending = queue.Reader.WaitToReadAsync(lifetime.Token).AsTask();
                 }
             }
@@ -118,7 +123,8 @@ public sealed class InsightUpdateSocket(InsightUpdateSnapshot snapshots, Insight
             while (!lifetime.IsCancellationRequested)
             {
                 var frame = await socket.ReceiveAsync(buffer.AsMemory(), receiving.Token);
-                if (frame.MessageType == WebSocketMessageType.Close) { lifetime.Cancel(); return; }
+                if (frame.MessageType == WebSocketMessageType.Close)
+                { lifetime.Cancel(); return; }
                 if (frame.MessageType != WebSocketMessageType.Text || !frame.EndOfMessage)
                 {
                     Stop(WebSocketCloseStatus.InvalidMessageType, "pong_required");
@@ -138,7 +144,8 @@ public sealed class InsightUpdateSocket(InsightUpdateSnapshot snapshots, Insight
 
         async Task Guard(Func<Task> operation)
         {
-            try { await operation(); }
+            try
+            { await operation(); }
             catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
             catch (PublicInsightReadException error) when (error.StatusCode is 401 or 403)
             { Stop(WebSocketCloseStatus.PolicyViolation, "membership_required"); }

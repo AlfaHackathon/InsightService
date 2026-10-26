@@ -38,7 +38,8 @@ public sealed class InsightUpdateSnapshot(IPublicInsightMembershipResolver membe
             var cursors = new HashSet<string>(StringComparer.Ordinal);
             do
             {
-                if (++pages > 100) { throw PublicInsightReadException.Unavailable("INSIGHT_UPDATE_RESYNC_REQUIRED"); }
+                if (++pages > 100)
+                { throw PublicInsightReadException.Unavailable("INSIGHT_UPDATE_RESYNC_REQUIRED"); }
                 var options = new InsightReadOptions { Limit = 20, Cursor = cursor };
                 if (kind == "personal")
                 {
@@ -47,7 +48,8 @@ public sealed class InsightUpdateSnapshot(IPublicInsightMembershipResolver membe
                     count += page.Items.Count;
                     foreach (var item in page.Items)
                     {
-                        if (item.CompanyId != expected.CompanyId) { throw PublicInsightReadException.Contract("INSIGHT_SCOPE_MISMATCH"); }
+                        if (item.CompanyId != expected.CompanyId)
+                        { throw PublicInsightReadException.Contract("INSIGHT_SCOPE_MISMATCH"); }
                         var revision = item.CurrentRevision;
                         if (Published(revision.PublicationClass, revision.Status, revision.Impact?.EvidenceStatus))
                         {
@@ -64,7 +66,8 @@ public sealed class InsightUpdateSnapshot(IPublicInsightMembershipResolver membe
                     count += page.Items.Count;
                     foreach (var item in page.Items)
                     {
-                        if (item.CompanyId != expected.CompanyId) { throw PublicInsightReadException.Contract("INSIGHT_SCOPE_MISMATCH"); }
+                        if (item.CompanyId != expected.CompanyId)
+                        { throw PublicInsightReadException.Contract("INSIGHT_SCOPE_MISMATCH"); }
                         // A failed company execution is not a new card notification.
                         if (item.CompanyStatus == "completed")
                         {
@@ -88,9 +91,11 @@ public sealed class InsightUpdateSnapshot(IPublicInsightMembershipResolver membe
     {
         await RequireScope(user, expected, ct);
         PublicInsightCard card;
-        try { card = await reads.Detail(user, head.Kind, head.Id, ct); }
+        try
+        { card = await reads.Detail(user, head.Kind, head.Id, ct); }
         catch (PublicInsightReadException error) when (error.StatusCode == 404) { return null; }
-        if (card.CompanyId != expected.CompanyId) { throw PublicInsightReadException.Contract("INSIGHT_SCOPE_MISMATCH"); }
+        if (card.CompanyId != expected.CompanyId)
+        { throw PublicInsightReadException.Contract("INSIGHT_SCOPE_MISMATCH"); }
         InsightUpdateHead? current = card switch
         {
             PublicPersonalInsightCard personal when Published(personal.CurrentRevision.PublicationClass, personal.CurrentRevision.Status, personal.CurrentRevision.Impact?.EvidenceStatus) =>
@@ -105,7 +110,8 @@ public sealed class InsightUpdateSnapshot(IPublicInsightMembershipResolver membe
         if (current is null || current.RevisionId != head.RevisionId ||
             (head.Kind == "personal" ? current.Version != head.Version :
                 !DateTimeOffset.TryParse(head.Version, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var time) ||
-                time != ((PublicGeneralInsightCard)card).UpdatedAt)) { return null; }
+                time != ((PublicGeneralInsightCard)card).UpdatedAt))
+        { return null; }
         return new("insight.upsert", head.Id, head.Kind, head.RevisionId, head.Version, DateTimeOffset.UtcNow);
     }
 

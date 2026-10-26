@@ -99,6 +99,20 @@ public sealed class InsightPlainTextTests
         Assert.Null(InsightPlainTextPolicy.ValidateCheckpoint(Checkpoint(location, "Общий заголовок", "Абзац.\n\nЕщё абзац."), default));
     }
 
+    [Theory]
+    [InlineData("null")]
+    [InlineData("{}")]
+    [InlineData("[]")]
+    [InlineData("{\"generalInsights\":null}")]
+    [InlineData("{\"generalInsights\":{}}")]
+    [InlineData("{\"generalInsights\":[]}")]
+    public void MissingOrNonArrayGeneralEntriesRemainEmpty(string json)
+    {
+        var plan = JsonSerializer.Deserialize<JsonElement>(json);
+        var checkpoint = JsonSerializer.SerializeToElement(new { plan, result = plan, segmentBatches = new[] { new { plan } } });
+        Assert.Null(InsightPlainTextPolicy.ValidateCheckpoint(checkpoint, default));
+    }
+
     [Fact]
     public void ExactLegacyGeneralEntriesCanBeCarriedWithoutRewritingButChangedOnesCannot()
     {

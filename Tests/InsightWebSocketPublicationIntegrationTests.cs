@@ -46,8 +46,10 @@ public sealed class InsightWebSocketPublicationIntegrationTests
         var previous = Assert.Single(await snapshots.Read(PublicInsightReadFixture.User, Scope, default));
         var published = fixture.Personal!.CurrentRevision with
         {
-            RevisionId = "published-revision-3", PreviousRevisionId = previous.RevisionId,
-            Title = "Пересмотр условий финансирования", Conclusion = "Обоснованный вывод сохранён без переписывания."
+            RevisionId = "published-revision-3",
+            PreviousRevisionId = previous.RevisionId,
+            Title = "Пересмотр условий финансирования",
+            Conclusion = "Обоснованный вывод сохранён без переписывания."
         };
         fixture.Personal = fixture.Personal with { CurrentRevision = published };
 

@@ -30,7 +30,8 @@ public sealed class InsightUpdateTransportTests
         builder.Services.AddScoped<InsightUpdateSocket>();
         builder.Services.AddSingleton(new InsightSocketLimits
         {
-            PollInterval = TimeSpan.FromMilliseconds(20), HeartbeatInterval = TimeSpan.FromMilliseconds(30)
+            PollInterval = TimeSpan.FromMilliseconds(20),
+            HeartbeatInterval = TimeSpan.FromMilliseconds(30)
         });
         var app = builder.Build();
         app.UseWebSockets();
@@ -51,8 +52,10 @@ public sealed class InsightUpdateTransportTests
         var fixture = new PublicInsightReadFixture { NextCursor = null };
         await using var app = await Start(fixture);
         using var client = app.GetTestClient();
-        if (user is not null) { client.DefaultRequestHeaders.Add("X-User-Id", user); }
-        if (expiry is not null) { client.DefaultRequestHeaders.Add(InsightUpdatesController.ExpiryHeader, expiry); }
+        if (user is not null)
+        { client.DefaultRequestHeaders.Add("X-User-Id", user); }
+        if (expiry is not null)
+        { client.DefaultRequestHeaders.Add(InsightUpdatesController.ExpiryHeader, expiry); }
         using var response = await client.PostAsync(InsightUpdatesController.TicketPath, null);
         Assert.Equal((HttpStatusCode)status, response.StatusCode);
         Assert.True(response.Headers.CacheControl!.NoStore);

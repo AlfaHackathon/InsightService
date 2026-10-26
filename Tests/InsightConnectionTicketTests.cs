@@ -36,7 +36,8 @@ public sealed class InsightConnectionTicketTests
         Assert.Equal(expiry, shortTicket.ExpiresAt);
         await Task.Delay(40);
         Assert.Null(tickets.Consume(shortTicket.Ticket));
-        for (var index = 0; index < 4; index++) { tickets.Issue(user, membership, DateTimeOffset.UtcNow.AddMinutes(1)); }
+        for (var index = 0; index < 4; index++)
+        { tickets.Issue(user, membership, DateTimeOffset.UtcNow.AddMinutes(1)); }
         Assert.Equal(429, Assert.Throws<PublicInsightReadException>(() => tickets.Issue(user, membership, DateTimeOffset.UtcNow.AddMinutes(1))).StatusCode);
         Assert.Equal(401, Assert.Throws<PublicInsightReadException>(() => tickets.Issue(user, membership, DateTimeOffset.UtcNow.AddSeconds(-1))).StatusCode);
     }

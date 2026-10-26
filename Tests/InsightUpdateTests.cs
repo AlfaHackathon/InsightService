@@ -13,9 +13,12 @@ public sealed class InsightUpdateTests
     private static readonly PublicInsightMembership Scope = new(PublicInsightReadFixture.Company, null);
     private static InsightSocketLimits FastLimits => new()
     {
-        PollInterval = TimeSpan.FromMilliseconds(15), HeartbeatInterval = TimeSpan.FromMilliseconds(15),
-        PongTimeout = TimeSpan.FromMilliseconds(150), SendTimeout = TimeSpan.FromMilliseconds(100),
-        ReadTimeout = TimeSpan.FromSeconds(2), QueueCapacity = 2
+        PollInterval = TimeSpan.FromMilliseconds(15),
+        HeartbeatInterval = TimeSpan.FromMilliseconds(15),
+        PongTimeout = TimeSpan.FromMilliseconds(150),
+        SendTimeout = TimeSpan.FromMilliseconds(100),
+        ReadTimeout = TimeSpan.FromSeconds(2),
+        QueueCapacity = 2
     };
 
     [Fact]
@@ -60,8 +63,11 @@ public sealed class InsightUpdateTests
     public async Task LegacyUnknownEvidenceIsDiagnosticEvenBeforeNarrativeReadIntegration()
     {
         var fixture = new PublicInsightReadFixture { NextCursor = null, General = null };
-        fixture.Personal = fixture.Personal! with { CurrentRevision = fixture.Personal.CurrentRevision with
-        { Impact = fixture.Personal.CurrentRevision.Impact! with { EvidenceStatus = "unknown" } } };
+        fixture.Personal = fixture.Personal! with
+        {
+            CurrentRevision = fixture.Personal.CurrentRevision with
+            { Impact = fixture.Personal.CurrentRevision.Impact! with { EvidenceStatus = "unknown" } }
+        };
         Assert.Empty(await Snapshot(fixture).Read(PublicInsightReadFixture.User, Scope, default));
         fixture.Personal = fixture.Personal with { CurrentRevision = fixture.Personal.CurrentRevision with { Impact = null, Status = "unknown" } };
         Assert.Empty(await Snapshot(fixture).Read(PublicInsightReadFixture.User, Scope, default));
@@ -166,7 +172,8 @@ public sealed class InsightUpdateTests
     private static List<JsonElement> Drain(FakeSocket socket)
     {
         var messages = new List<JsonElement>();
-        while (socket.Sent.Reader.TryRead(out var message)) { messages.Add(message); }
+        while (socket.Sent.Reader.TryRead(out var message))
+        { messages.Add(message); }
         return messages;
     }
 
@@ -192,13 +199,15 @@ public sealed class InsightUpdateTests
         public override async Task<WebSocketReceiveResult> ReceiveAsync(ArraySegment<byte> buffer, CancellationToken cancellationToken)
         {
             var bytes = await received.Reader.ReadAsync(cancellationToken);
-            if (bytes.Length == 0) { return new(0, WebSocketMessageType.Close, true); }
+            if (bytes.Length == 0)
+            { return new(0, WebSocketMessageType.Close, true); }
             bytes.CopyTo(buffer.AsSpan());
             return new(bytes.Length, WebSocketMessageType.Text, true);
         }
         public override async Task SendAsync(ArraySegment<byte> buffer, WebSocketMessageType messageType, bool endOfMessage, CancellationToken cancellationToken)
         {
-            if (SlowSend) { await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken); }
+            if (SlowSend)
+            { await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken); }
             var message = JsonDocument.Parse(buffer.AsMemory()).RootElement.Clone();
             await Sent.Writer.WriteAsync(message, cancellationToken);
             if (AutoPong && message.GetProperty("eventType").GetString() == "heartbeat")
