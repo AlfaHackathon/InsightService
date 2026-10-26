@@ -9,6 +9,7 @@ builder.Services.AddServiceSwagger();
 var app = builder.Build();
 app.Services.UseMigrations();
 app.UseInsightRequestHandling();
+app.UseWebSockets(new WebSocketOptions { KeepAliveInterval = TimeSpan.FromSeconds(10) });
 app.UsePublicInsightReads();
 app.UseServiceSwagger();
 app.MapControllers();

@@ -18,14 +18,19 @@ public static class PublicInsightReadMiddleware
             if (!IsPublicInsightRead(context.Request.Path))
             { await next(context); return; }
             context.Response.Headers.CacheControl = "private, no-store";
-            var headers = context.Request.Headers["X-User-Id"];
-            if (headers.Count != 1 || headers[0] is not { Length: 36 } raw || !Guid.TryParseExact(raw, "D", out var user) || user == Guid.Empty)
+            // This exact endpoint authenticates a single-use ticket before upgrade.
+            // Every other public path, including ticket issuance, requires Gateway identity.
+            if (context.Request.Path != "/insight-service/insights/ws")
             {
-                context.Response.StatusCode = 401;
-                await context.Response.WriteAsJsonAsync(new { error = "Gateway user context required" });
-                return;
+                var headers = context.Request.Headers["X-User-Id"];
+                if (headers.Count != 1 || headers[0] is not { Length: 36 } raw || !Guid.TryParseExact(raw, "D", out var user) || user == Guid.Empty)
+                {
+                    context.Response.StatusCode = 401;
+                    await context.Response.WriteAsJsonAsync(new { error = "Gateway user context required" });
+                    return;
+                }
+                context.Items[Identity] = user;
             }
-            context.Items[Identity] = user;
             try
             { await next(context); }
             catch (PublicInsightReadException error)
